@@ -49,14 +49,10 @@ const ChatScreen: React.FC = () => {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  // ... (Proactive Messages Logic - unchanged)
-
   // Browser Integration Handlers (moved to SettingsScreen)
   const handleCamera = () => {
       cameraInputRef.current?.click();
   };
-
-  // ... (Rest of existing functions: getAiClient, scrollToBottom, etc.)
 
   // Proactive Messages Logic moved to AppContext.tsx for centralized handling and FCM support
   
