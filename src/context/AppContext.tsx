@@ -3,7 +3,7 @@ import { gzipSync, strToU8, gunzipSync, strFromU8 } from 'fflate';
 import { saveToDB, loadFromDB, deleteFromDB, clearDB } from '../services/db';
 import { onForegroundMessage, requestNotificationPermission } from '../services/webPushService';
 import { showNativeNotification } from '../services/notificationService';
-import { backupToFirestore, restoreFromFirestore, uploadGalleryToFirebaseStorage, restoreGalleryFromFirebaseStorage } from '../services/firebaseService';
+import { backupToFirestore, restoreFromFirestore, uploadGalleryToFirebaseStorage, restoreGalleryFromFirebaseStorage, uploadKnowledgeBaseToFirebaseStorage, restoreKnowledgeBaseFromFirebaseStorage } from '../services/firebaseService';
 import { AIProfile, UserProfile, ChatMessage, GalleryItem, JournalEntry, Memory, KnowledgeBaseDocument, ChatSession, Background, ProactiveCommunication } from '../types';
 
 export interface Toast {
@@ -156,6 +156,8 @@ interface AppContextType extends AppState {
   firebaseRestore: () => Promise<any | null>;
   firebaseGalleryBackup: (onProgress?: (done: number, total: number) => void) => Promise<number>;
   firebaseGalleryRestore: (onProgress?: (done: number, total: number) => void) => Promise<number>;
+  firebaseKbBackup: (onProgress?: (done: number, total: number) => void) => Promise<number>;
+  firebaseKbRestore: (onProgress?: (done: number, total: number) => void) => Promise<Array<{ name: string; content: string }>>;
   realTimeSyncEnabled: boolean;
   setRealTimeSyncEnabled: (enabled: boolean) => void;
   autoBackupSchedule: 'off' | 'daily' | 'weekly';
