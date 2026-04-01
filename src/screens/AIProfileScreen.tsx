@@ -147,8 +147,6 @@ const AIProfileScreen: React.FC = () => {
 
   const geminiVoices = ['Puck', 'Charon', 'Kore', 'Fenrir', 'Zephyr'];
 
-  // ... (existing useEffects)
-
   const handleTestVoice = async () => {
     if (isTestingVoice) return;
     addToast({ title: "Voice Test", message: "Generating voice sample...", type: "info" });
