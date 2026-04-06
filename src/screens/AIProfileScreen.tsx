@@ -662,49 +662,6 @@ const AIProfileScreen: React.FC = () => {
   // LLM max tokens
   const [maxTokens, setMaxTokens] = useState<number>(aiProfile.maxTokens ?? 2048);
 
-  // Voice clone state
-  const [showClonePanel, setShowClonePanel] = useState(false);
-  const [cloneName, setCloneName] = useState('');
-  const [cloneGender, setCloneGender] = useState<'Male' | 'Female' | 'Neutral' | 'Unspecified'>('Unspecified');
-  const [cloneEnhance, setCloneEnhance] = useState(true);
-  const [cloneAudioFile, setCloneAudioFile] = useState<File | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
-  const [isCloning, setIsCloning] = useState(false);
-  const [recordingSeconds, setRecordingSeconds] = useState(0);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const recordingChunksRef = useRef<Blob[]>([]);
-  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const cloneFileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleStartRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-      recordingChunksRef.current = [];
-      recorder.ondataavailable = (e) => { if (e.data.size > 0) recordingChunksRef.current.push(e.data); };
-      recorder.onstop = () => {
-        stream.getTracks().forEach(t => t.stop());
-        const blob = new Blob(recordingChunksRef.current, { type: 'audio/webm' });
-        const file = new File([blob], 'recording.webm', { type: 'audio/webm' });
-        setCloneAudioFile(file);
-        setIsRecording(false);
-        if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
-      };
-      recorder.start();
-      mediaRecorderRef.current = recorder;
-      setIsRecording(true);
-      setRecordingSeconds(0);
-      recordingTimerRef.current = setInterval(() => setRecordingSeconds(s => s + 1), 1000);
-    } catch (e: any) {
-      addToast({ title: "Microphone Error", message: e.message || "Could not access microphone.", type: "error" });
-    }
-  };
-
-  const handleStopRecording = () => {
-    mediaRecorderRef.current?.stop();
-    if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
-  };
-
   const fetchElevenLabsVoices = useCallback(async () => {
     if (!elevenLabsApiKey) return;
     setIsLoadingElevenLabsVoices(true);
