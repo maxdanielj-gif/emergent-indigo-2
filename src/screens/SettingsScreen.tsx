@@ -237,21 +237,9 @@ const SettingsScreen: React.FC = () => {
         addToast({ title: 'No backup found', message: `No Firebase backup found for user ID: ${userId}`, type: 'warning' });
         return;
       }
-      // Restore the sync data to MongoDB
-      if (backup.data && userId) {
-        const res = await fetch('/api/db/import', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, data: backup.data }),
-        });
-        if (res.ok) {
-          addToast({ title: 'Restore complete', message: 'Data restored from Firebase backup. Reload the page to see changes.', type: 'success' });
-        } else {
-          addToast({ title: 'Partial restore', message: 'Firebase backup found but cloud sync restore failed. Try the JSON import.', type: 'warning' });
-        }
-      } else {
-        addToast({ title: 'Backup found', message: `Firebase backup found but no data payload. Saved ${backup.backedUpAt ? new Date(backup.backedUpAt).toLocaleString() : 'N/A'}.`, type: 'info' });
-      }
+      // Restore all app data directly into local state
+      importData(JSON.stringify(backup), setChatHistory, setSessions, setActiveSessionId);
+      addToast({ title: 'Restore complete', message: 'App data restored from Firebase. Gallery images can be restored using Full Restore below.', type: 'success' });
     } catch (e: any) {
       addToast({ title: 'Restore failed', message: e.message || 'Could not reach Firebase.', type: 'error' });
     } finally {
@@ -934,7 +922,7 @@ const SettingsScreen: React.FC = () => {
                   <button onClick={handleFirebaseRestore} disabled={isFirebaseRestoring || !userId}
                     data-testid="firebase-restore-btn"
                     className="flex-1 py-2.5 bg-white dark:bg-indigo-900 border border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 rounded-xl font-medium hover:bg-indigo-50 dark:hover:bg-indigo-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm">
-                    {isFirebaseRestoring ? <><RefreshCw className="w-4 h-4 animate-spin" />Checking…</> : 'Check Backup'}
+                    {isFirebaseRestoring ? <><RefreshCw className="w-4 h-4 animate-spin" />Restoring…</> : 'Restore from Firestore'}
                   </button>
                 </div>
                 {lastFirebaseBackupTime && (

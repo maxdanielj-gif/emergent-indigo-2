@@ -1729,20 +1729,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Kept as no-ops so any old code that calls them doesn't crash.
-  // Firebase and Google OAuth have been removed from this app.
   const setFirebaseConfig = (config: {
     apiKey?: string | null; authDomain?: string | null; projectId?: string | null;
     storageBucket?: string | null; appId?: string | null;
     messagingSenderId?: string | null; vapidKey?: string | null;
   }) => {
-    if (config.apiKey           !== undefined) { setFirebaseApiKey(config.apiKey);                     saveData({ firebaseApiKey:           config.apiKey }); }
-    if (config.authDomain       !== undefined) { setFirebaseAuthDomain(config.authDomain);             saveData({ firebaseAuthDomain:       config.authDomain }); }
-    if (config.projectId        !== undefined) { setFirebaseProjectId(config.projectId);               saveData({ firebaseProjectId:        config.projectId }); }
-    if (config.storageBucket    !== undefined) { setFirebaseStorageBucket(config.storageBucket);       saveData({ firebaseStorageBucket:    config.storageBucket }); }
-    if (config.appId            !== undefined) { setFirebaseAppId(config.appId);                       saveData({ firebaseAppId:            config.appId }); }
-    if (config.messagingSenderId !== undefined){ setFirebaseMessagingSenderId(config.messagingSenderId);saveData({ firebaseMessagingSenderId:config.messagingSenderId }); }
-    if (config.vapidKey         !== undefined) { setFirebaseVapidKey(config.vapidKey);                 saveData({ firebaseVapidKey:         config.vapidKey }); }
+    // Update React state for each provided field, then patch IDB directly
+    // (same pattern as setMongoUri / setAnthropicApiKey to avoid stale closure issues)
+    const updates: Record<string, any> = {};
+    if (config.apiKey           !== undefined) { setFirebaseApiKey(config.apiKey);                     updates.firebaseApiKey           = config.apiKey; }
+    if (config.authDomain       !== undefined) { setFirebaseAuthDomain(config.authDomain);             updates.firebaseAuthDomain       = config.authDomain; }
+    if (config.projectId        !== undefined) { setFirebaseProjectId(config.projectId);               updates.firebaseProjectId        = config.projectId; }
+    if (config.storageBucket    !== undefined) { setFirebaseStorageBucket(config.storageBucket);       updates.firebaseStorageBucket    = config.storageBucket; }
+    if (config.appId            !== undefined) { setFirebaseAppId(config.appId);                       updates.firebaseAppId            = config.appId; }
+    if (config.messagingSenderId !== undefined){ setFirebaseMessagingSenderId(config.messagingSenderId);updates.firebaseMessagingSenderId = config.messagingSenderId; }
+    if (config.vapidKey         !== undefined) { setFirebaseVapidKey(config.vapidKey);                 updates.firebaseVapidKey         = config.vapidKey; }
+    if (Object.keys(updates).length > 0) {
+      loadFromDB('indigo_app_data_core').then((core: any) => {
+        if (core) saveToDB('indigo_app_data_core', { ...core, ...updates });
+      }).catch(() => {});
+    }
   };
   const setGoogleConfig   = (_clientId: string, _clientSecret: string) => {};
 
