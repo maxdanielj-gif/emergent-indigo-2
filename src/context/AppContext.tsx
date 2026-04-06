@@ -54,19 +54,14 @@ interface AppState {
   firebaseServiceAccountKey: string | null;
   googleClientId: string | null;
   googleClientSecret: string | null;
-  openRouterApiKey: string | null;
   anthropicApiKey: string | null;
   elevenLabsApiKey: string | null;
   setElevenLabsApiKey: (key: string | null) => void;
   geminiApiKey: string | null;
   setGeminiApiKey: (key: string | null) => void;
-  freepikApiKey: string | null;
-  setFreepikApiKey: (key: string | null) => void;
   wavespeedApiKey: string | null;
   setWavespeedApiKey: (key: string | null) => void;
   kaggleApiKey: string | null;
-  openaiApiKey: string | null;
-  stabilityApiKey: string | null;
   lastInteractionTime: number;
   userId: string;
   isSuccessfullyLoaded: boolean;
@@ -112,11 +107,8 @@ interface AppContextType extends AppState {
   restoreGalleryFromDrive: (mediaType?: 'image' | 'video') => Promise<void>;
   importData: (json: string, setChatHistory: (history: ChatMessage[]) => void, setSessions: (sessions: ChatSession[]) => void, setActiveSessionId: (id: string | null) => void) => void;
   setApiKey: (key: string | null) => void;
-  setOpenRouterApiKey: (key: string | null) => void;
   cartesiaApiKey: string | null;
   setCartesiaApiKey: (key: string | null) => void;
-  emergentLlmKey: string | null;
-  setEmergentLlmKey: (key: string | null) => void;
   mongoUri: string | null;
   setMongoUri: (uri: string | null) => void;
   lastCloudSyncTime: number | null;
@@ -127,8 +119,6 @@ interface AppContextType extends AppState {
   setLastGalleryBackupTime: (t: number | null) => void;
   setAnthropicApiKey: (key: string | null) => void;
   setKaggleApiKey: (key: string | null) => void;
-  setOpenaiApiKey: (key: string | null) => void;
-  setStabilityApiKey: (key: string | null) => void;
   showTutorial: boolean;
   setShowTutorial: (show: boolean) => void;
   setAutoSaveChat: (enabled: boolean) => void;
@@ -303,9 +293,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [proactiveCommunications, setProactiveCommunications] = useState<ProactiveCommunication[]>([]);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [apiKey, setApiKeyState] = useState<string | null>(null);
-  const [openRouterApiKey, setOpenRouterApiKeyState] = useState<string | null>(null);
   const [cartesiaApiKey,   setCartesiaApiKeyState]   = useState<string | null>(null);
-  const [emergentLlmKey,   setEmergentLlmKeyState]   = useState<string | null>(null);
   const [mongoUri,         setMongoUriState]          = useState<string | null>(null);
   const [lastCloudSyncTime,      setLastCloudSyncTimeState]      = useState<number | null>(null);
   const [lastFirebaseBackupTime, setLastFirebaseBackupTimeState] = useState<number | null>(null);
@@ -315,11 +303,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [anthropicApiKey, setAnthropicApiKeyState] = useState<string | null>(null);
   const [elevenLabsApiKey, setElevenLabsApiKeyState] = useState<string | null>(null);
   const [geminiApiKey, setGeminiApiKeyState] = useState<string | null>(null);
-  const [freepikApiKey, setFreepikApiKeyState] = useState<string | null>(null);
   const [wavespeedApiKey, setWavespeedApiKeyState] = useState<string | null>(null);
   const [kaggleApiKey, setKaggleApiKeyState] = useState<string | null>(null);
-  const [openaiApiKey, setOpenaiApiKeyState] = useState<string | null>(null);
-  const [stabilityApiKey, setStabilityApiKeyState] = useState<string | null>(null);
   const [autoSaveChat, setAutoSaveChatState] = useState(true);
   const [autoSaveChatInterval, setAutoSaveChatInterval] = useState(30); // Default 30 seconds
   const [autoJsonBackup, setAutoJsonBackupState] = useState(false);
@@ -611,12 +596,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 setAnthropicApiKeyState(savedData.anthropicApiKey || null);
                 setElevenLabsApiKeyState(savedData.elevenLabsApiKey || null);
                 setGeminiApiKeyState(savedData.geminiApiKey || null);
-                setFreepikApiKeyState(savedData.freepikApiKey || null);
                 setWavespeedApiKeyState(savedData.wavespeedApiKey || null);
-                setStabilityApiKeyState(savedData.stabilityApiKey || null);
-                setOpenRouterApiKeyState(savedData.openRouterApiKey || null);
                 setCartesiaApiKeyState(savedData.cartesiaApiKey || null);
-                setEmergentLlmKeyState(savedData.emergentLlmKey || null);
                 setMongoUriState(savedData.mongoUri || null);
                 setLastCloudSyncTimeState(savedData.lastCloudSyncTime || null);
                 setLastFirebaseBackupTimeState(savedData.lastFirebaseBackupTime || null);
@@ -739,17 +720,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           firebaseServiceAccountKey,
           googleClientId,
           googleClientSecret,
-          openRouterApiKey,
           cartesiaApiKey,
-          emergentLlmKey,
           anthropicApiKey,
           elevenLabsApiKey,
           geminiApiKey,
-          freepikApiKey,
           wavespeedApiKey,
           kaggleApiKey,
-          openaiApiKey,
-          stabilityApiKey,
           mongoUri,
           lastCloudSyncTime,
           lastFirebaseBackupTime,
@@ -815,14 +791,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     // Debounce save to avoid excessive writes
-  }, [aiProfile, savedPersonas, userProfile, gallery, journal, knowledgeBase, memories, apiKey, anthropicApiKey, asyncApiKey, elevenLabsApiKey, geminiApiKey, freepikApiKey, wavespeedApiKey, fcmToken, autoSaveChat, autoJsonBackup, autoDriveBackup, isLoaded, isGoogleDriveConnected, lastInteractionTime, userId, openRouterApiKey, cartesiaApiKey, emergentLlmKey, stabilityApiKey, openaiApiKey, kaggleApiKey, firebaseApiKey, firebaseAuthDomain, firebaseProjectId, firebaseStorageBucket, firebaseMessagingSenderId, firebaseAppId, firebaseVapidKey, firebaseServiceAccountKey, mongoUri]);
+  }, [aiProfile, savedPersonas, userProfile, gallery, journal, knowledgeBase, memories, apiKey, anthropicApiKey, asyncApiKey, elevenLabsApiKey, geminiApiKey, wavespeedApiKey, fcmToken, autoSaveChat, autoJsonBackup, autoDriveBackup, isLoaded, isGoogleDriveConnected, lastInteractionTime, userId, cartesiaApiKey, kaggleApiKey, firebaseApiKey, firebaseAuthDomain, firebaseProjectId, firebaseStorageBucket, firebaseMessagingSenderId, firebaseAppId, firebaseVapidKey, firebaseServiceAccountKey, mongoUri]);
 
   // Debounce save to avoid excessive writes
   useEffect(() => {
     if (!isLoaded) return;
     const timeoutId = setTimeout(saveData, 1000);
     return () => clearTimeout(timeoutId);
-  }, [aiProfile, savedPersonas, userProfile, gallery, journal, knowledgeBase, memories, apiKey, anthropicApiKey, asyncApiKey, elevenLabsApiKey, geminiApiKey, freepikApiKey, wavespeedApiKey, fcmToken, autoSaveChat, autoJsonBackup, autoDriveBackup, isLoaded, isGoogleDriveConnected, lastInteractionTime, userId, openRouterApiKey, cartesiaApiKey, emergentLlmKey, stabilityApiKey, openaiApiKey, kaggleApiKey, firebaseApiKey, firebaseAuthDomain, firebaseProjectId, firebaseStorageBucket, firebaseMessagingSenderId, firebaseAppId, firebaseVapidKey, firebaseServiceAccountKey, mongoUri, saveData]);
+  }, [aiProfile, savedPersonas, userProfile, gallery, journal, knowledgeBase, memories, apiKey, anthropicApiKey, asyncApiKey, elevenLabsApiKey, geminiApiKey, wavespeedApiKey, fcmToken, autoSaveChat, autoJsonBackup, autoDriveBackup, isLoaded, isGoogleDriveConnected, lastInteractionTime, userId, cartesiaApiKey, kaggleApiKey, firebaseApiKey, firebaseAuthDomain, firebaseProjectId, firebaseStorageBucket, firebaseMessagingSenderId, firebaseAppId, firebaseVapidKey, firebaseServiceAccountKey, mongoUri, saveData]);
 
   // ── Gallery save — completely separate from saveData to avoid hook ordering issues.
   // Only runs when galleryLoaded is true, so it never overwrites with an empty list.
@@ -917,8 +893,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           journal, knowledgeBase, memories,
           gallery,
           apiKey, anthropicApiKey, asyncApiKey, elevenLabsApiKey, geminiApiKey,
-          freepikApiKey, wavespeedApiKey, stabilityApiKey, openRouterApiKey, cartesiaApiKey,
-          emergentLlmKey, mongoUri,
+          wavespeedApiKey, cartesiaApiKey,
+          mongoUri,
           autoSaveChat, autoBackupSchedule,
         }, firebaseRuntimeConfig);
         const ts = Date.now();
@@ -960,8 +936,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           journal, knowledgeBase, memories,
           gallery,
           apiKey, anthropicApiKey, asyncApiKey, elevenLabsApiKey, geminiApiKey,
-          freepikApiKey, wavespeedApiKey, stabilityApiKey, openRouterApiKey, cartesiaApiKey,
-          emergentLlmKey, mongoUri,
+          wavespeedApiKey, cartesiaApiKey,
+          mongoUri,
           autoSaveChat, autoBackupSchedule, realTimeSyncEnabled,
         }, firebaseRuntimeConfig);
         console.log('[Indigo] Real-time sync → Firestore complete');
@@ -1238,17 +1214,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setApiKeyState(key);
   };
 
-  const setOpenRouterApiKey = (key: string | null) => {
-    setOpenRouterApiKeyState(key);
-    saveData({ openRouterApiKey: key });
-  };
   const setCartesiaApiKey = (key: string | null) => {
     setCartesiaApiKeyState(key);
     saveData({ cartesiaApiKey: key });
-  };
-  const setEmergentLlmKey = (key: string | null) => {
-    setEmergentLlmKeyState(key);
-    saveData({ emergentLlmKey: key });
   };
   const setMongoUri = (uri: string | null) => {
     setMongoUriState(uri);
@@ -1299,14 +1267,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const setKaggleApiKey = (key: string | null) => {
     setKaggleApiKeyState(key);
-  };
-
-  const setOpenaiApiKey = (key: string | null) => {
-    setOpenaiApiKeyState(key);
-  };
-
-  const setStabilityApiKey = (key: string | null) => {
-    setStabilityApiKeyState(key);
   };
 
   // ── Firebase backup / restore ────────────────────────────────────────────────
@@ -1891,20 +1851,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       firebaseAppId, firebaseMessagingSenderId, firebaseVapidKey, setFirebaseConfig,
       firebaseServiceAccountKey, setFirebaseServiceAccountKey,
       googleClientId, googleClientSecret, setGoogleConfig,
-      openRouterApiKey, setOpenRouterApiKey,
       cartesiaApiKey, setCartesiaApiKey,
-      emergentLlmKey, setEmergentLlmKey,
       mongoUri, setMongoUri,
       lastCloudSyncTime, lastFirebaseBackupTime, lastGalleryBackupTime,
       setLastCloudSyncTime, setLastFirebaseBackupTime, setLastGalleryBackupTime,
       anthropicApiKey, setAnthropicApiKey,
       elevenLabsApiKey, setElevenLabsApiKey: setElevenLabsApiKeyState,
       geminiApiKey, setGeminiApiKey: setGeminiApiKeyState,
-      freepikApiKey, setFreepikApiKey: setFreepikApiKeyState,
       wavespeedApiKey, setWavespeedApiKey: setWavespeedApiKeyState,
       kaggleApiKey, setKaggleApiKey,
-      openaiApiKey, setOpenaiApiKey,
-      stabilityApiKey, setStabilityApiKey,
       isLoaded, isSuccessfullyLoaded, lastInteractionTime, setLastInteractionTime,
       userId, setUserId, isSyncing, setIsSyncing,
       exportGalleryData, exportGalleryChunks, importGalleryData, importGalleryChunks, syncGalleryToCloud, restoreGalleryFromCloud, restoreGalleryFromDrive,

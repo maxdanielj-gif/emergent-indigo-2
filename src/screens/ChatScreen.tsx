@@ -13,8 +13,8 @@ import { performOCR, processFile } from '../services/ocrService';
 const ChatScreen: React.FC = () => {
   const { 
     aiProfile, userProfile, knowledgeBase, 
-    addToKnowledgeBase, addToGallery, apiKey, asyncApiKey, openRouterApiKey, 
-    anthropicApiKey, geminiApiKey, elevenLabsApiKey, kaggleApiKey, openaiApiKey, stabilityApiKey,
+    addToKnowledgeBase, addToGallery, apiKey, asyncApiKey,
+    anthropicApiKey, geminiApiKey, elevenLabsApiKey, kaggleApiKey,
     cartesiaApiKey,
     memories, journal, 
     addJournalEntry, addMemory, showTimestamps, timeZone, addToast,
@@ -386,7 +386,6 @@ const ChatScreen: React.FC = () => {
           userProfile,
           anthropicKey: anthropicApiKey || undefined,
           geminiKey: geminiApiKey || undefined,
-          openRouterKey: openRouterApiKey || undefined,
           attachments: attachments.length > 0 ? attachments : undefined,
           timeZone,
         }),

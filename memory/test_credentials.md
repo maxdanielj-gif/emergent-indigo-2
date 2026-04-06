@@ -5,7 +5,6 @@
 - No authentication required (open access)
 
 ## API Keys (stored in /app/.env)
-- STABILITY_API_KEY: sk-bIYl9aIxnqTBLx9tB8PLBPWC1LcjTFsfRdBAR8KrDNBbKtlL
 - Firebase project: gen-lang-client-0184415198
 
 ## Services
