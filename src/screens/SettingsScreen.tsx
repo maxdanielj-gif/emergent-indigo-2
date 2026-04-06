@@ -10,12 +10,10 @@ import { Download, Upload, Trash2, Bell, FileText, Key, HelpCircle, Save, Databa
 const SettingsScreen: React.FC = () => {
   const {
     importData, knowledgeBase, addToKnowledgeBase,
-    asyncApiKey, setAsyncApiKey,
     anthropicApiKey, setAnthropicApiKey,
     elevenLabsApiKey, setElevenLabsApiKey,
     geminiApiKey, setGeminiApiKey,
     wavespeedApiKey, setWavespeedApiKey,
-    cartesiaApiKey, setCartesiaApiKey,
     mongoUri, setMongoUri,
     setShowTutorial,
     autoSaveChat, setAutoSaveChat, autoSaveChatInterval, setAutoSaveChatInterval,
@@ -50,12 +48,10 @@ const SettingsScreen: React.FC = () => {
   const fileInputRef  = useRef<HTMLInputElement>(null);
   const kbInputRef    = useRef<HTMLInputElement>(null);
 
-  const [localAsyncApiKey,        setLocalAsyncApiKey]        = useState(asyncApiKey || '');
   const [localAnthropicApiKey,    setLocalAnthropicApiKey]    = useState(anthropicApiKey || '');
   const [localElevenLabsApiKey,   setLocalElevenLabsApiKey]   = useState(elevenLabsApiKey || '');
   const [localGeminiApiKey,       setLocalGeminiApiKey]       = useState(geminiApiKey || '');
   const [localWavespeedApiKey,  setLocalWavespeedApiKey]  = useState(wavespeedApiKey  || '');
-  const [localCartesiaApiKey,   setLocalCartesiaApiKey]   = useState(cartesiaApiKey   || '');
   const [localMongoUri,         setLocalMongoUri]         = useState(mongoUri         || '');
   const [isApplyingMongo,       setIsApplyingMongo]       = useState(false);
   const [isFirebaseBackingUp,  setIsFirebaseBackingUp]  = useState(false);
@@ -90,11 +86,9 @@ const SettingsScreen: React.FC = () => {
 
   // Sync local key fields once the context loads saved values from IndexedDB
   React.useEffect(() => { setLocalAnthropicApiKey(anthropicApiKey || ''); }, [anthropicApiKey]);
-  React.useEffect(() => { setLocalAsyncApiKey(asyncApiKey || ''); }, [asyncApiKey]);
   React.useEffect(() => { setLocalElevenLabsApiKey(elevenLabsApiKey || ''); }, [elevenLabsApiKey]);
   React.useEffect(() => { setLocalGeminiApiKey(geminiApiKey || ''); }, [geminiApiKey]);
   React.useEffect(() => { setLocalWavespeedApiKey(wavespeedApiKey || ''); }, [wavespeedApiKey]);
-  React.useEffect(() => { setLocalCartesiaApiKey(cartesiaApiKey || ''); }, [cartesiaApiKey]);
   React.useEffect(() => { setLocalMongoUri(mongoUri || ''); }, [mongoUri]);
   const [localSyncId,          setLocalSyncId]          = useState(userId || '');
   const [recoveryId,           setRecoveryId]           = useState('');
@@ -163,11 +157,6 @@ const SettingsScreen: React.FC = () => {
     addToast({ title: 'Saved', message: 'Anthropic API key saved.', type: 'success' });
   };
 
-  const handleSaveAsyncKey = () => {
-    setAsyncApiKey(localAsyncApiKey.trim() || null);
-    addToast({ title: 'Saved', message: 'Async API key saved.', type: 'success' });
-  };
-
   const handleSaveElevenLabsKey = () => {
     setElevenLabsApiKey(localElevenLabsApiKey.trim() || null);
     addToast({ title: 'Saved', message: 'ElevenLabs API key saved.', type: 'success' });
@@ -182,11 +171,6 @@ const SettingsScreen: React.FC = () => {
     setWavespeedApiKey(localWavespeedApiKey.trim() || null);
     addToast({ title: 'Saved', message: 'WaveSpeed API key saved.', type: 'success' });
   };
-  const handleSaveCartesiaKey = () => {
-    setCartesiaApiKey(localCartesiaApiKey.trim() || null);
-    addToast({ title: 'Saved', message: 'Cartesia key saved.', type: 'success' });
-  };
-
   const handleSaveFirebaseConfig = () => {
     setFirebaseConfig({
       apiKey:            localFbApiKey.trim()        || null,
@@ -623,26 +607,6 @@ const SettingsScreen: React.FC = () => {
               </p>
             </div>
 
-            {/* Async */}
-            <div>
-              <label className="block text-sm font-medium text-indigo-700 dark:text-indigo-300 mb-1">
-                Async API Key <span className="text-indigo-400 dark:text-indigo-500 font-normal">(required for Async TTS)</span>
-              </label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-400" />
-                  <input
-                    type="password"
-                    value={localAsyncApiKey}
-                    onChange={(e) => setLocalAsyncApiKey(e.target.value)}
-                    placeholder="Your Async API key"
-                    className="app-input pl-9"
-                  />
-                </div>
-                <button onClick={handleSaveAsyncKey} className="app-btn-primary">Save</button>
-              </div>
-            </div>
-
             {/* ElevenLabs */}
             <div>
               <label className="block text-sm font-medium text-indigo-700 dark:text-indigo-300 mb-1">
@@ -709,27 +673,6 @@ const SettingsScreen: React.FC = () => {
               </div>
               <p className="text-xs text-indigo-500 dark:text-indigo-400 mt-1">
                 Get a key at <a href="https://wavespeed.ai/accesskey" target="_blank" rel="noreferrer" className="underline">wavespeed.ai/accesskey</a>. Enables WaveSpeed image editing and video generation. Requires a top-up to activate.
-              </p>
-            </div>
-
-            {/* Cartesia */}
-            <div>
-              <label className="block text-sm font-medium text-indigo-700 dark:text-indigo-300 mb-1">
-                Cartesia API Key <span className="text-indigo-400 dark:text-indigo-500 font-normal">(for Cartesia TTS)</span>
-              </label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-400" />
-                  <input type="password" value={localCartesiaApiKey}
-                    onChange={(e) => setLocalCartesiaApiKey(e.target.value)}
-                    placeholder="Your Cartesia API key"
-                    data-testid="cartesia-api-key-input"
-                    className="app-input pl-9" />
-                </div>
-                <button onClick={handleSaveCartesiaKey} data-testid="cartesia-api-key-save" className="app-btn-primary">Save</button>
-              </div>
-              <p className="text-xs text-indigo-500 dark:text-indigo-400 mt-1">
-                Get a key at <a href="https://play.cartesia.ai/keys" target="_blank" rel="noreferrer" className="underline">play.cartesia.ai/keys</a>. Fast, realistic neural TTS.
               </p>
             </div>
 

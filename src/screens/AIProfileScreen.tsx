@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { generateAsyncSpeech, listAsyncVoices, cloneAsyncVoice, generateElevenLabsSpeech, listElevenLabsVoices, generateCartesiaSpeech } from '../services/asyncService';
+import { generateElevenLabsSpeech, listElevenLabsVoices } from '../services/asyncService';
 import { useApp } from '../context/AppContext';
 import { useChat } from '../context/ChatContext';
 import { AIProfile, Background, ChatMessage, ChatSession } from '../types';
@@ -27,11 +27,10 @@ import {
 import PreviewChat from '../components/PreviewChat';
 
 const AIProfileScreen: React.FC = () => {
-  const { 
-    aiProfile, setAIProfile, savePersona, deletePersona, savedPersonas, loadPersona, 
-    asyncApiKey, setAmbientMode, setAmbientFrequency, addToast,
+  const {
+    aiProfile, setAIProfile, savePersona, deletePersona, savedPersonas, loadPersona,
+    setAmbientMode, setAmbientFrequency, addToast,
     anthropicApiKey, elevenLabsApiKey, geminiApiKey, userId,
-    cartesiaApiKey,
   } = useApp();
   const { chatHistory, sessions, activeSessionId, setChatHistory, setSessions, setActiveSessionId } = useChat();
   const [name, setName] = useState(aiProfile.name);
@@ -50,10 +49,9 @@ const AIProfileScreen: React.FC = () => {
   const [autoReadMessages, setAutoReadMessages] = useState(aiProfile.autoReadMessages || false);
   const [voiceGender, setVoiceGender] = useState<'male' | 'female' | 'none'>(aiProfile.voiceGender || 'none');
   const [voiceDescription, setVoiceDescription] = useState(aiProfile.voiceDescription || '');
-  const [voiceProvider, setVoiceProvider] = useState<'browser' | 'async' | 'elevenlabs' | 'cartesia'>(
-    (aiProfile.voiceProvider === 'gemini' ? 'browser' : aiProfile.voiceProvider) || 'browser'
+  const [voiceProvider, setVoiceProvider] = useState<'browser' | 'elevenlabs'>(
+    (aiProfile.voiceProvider === 'elevenlabs') ? 'elevenlabs' : 'browser'
   );
-  const [asyncVoiceId, setAsyncVoiceId] = useState(aiProfile.asyncVoiceId || null);
   const [responseLength, setResponseLength] = useState<AIProfile['responseLength']>(aiProfile.responseLength || 'medium');
   const [responseDetail, setResponseDetail] = useState<AIProfile['responseDetail']>(aiProfile.responseDetail || 'standard');
   const [responseTone, setResponseTone] = useState<AIProfile['responseTone']>(aiProfile.responseTone || 'friendly');
@@ -93,18 +91,6 @@ const AIProfileScreen: React.FC = () => {
   }, [userId]);
   
   const CLAUDE_MODELS = ['claude-sonnet-4-6', 'claude-opus-4-6', 'claude-haiku-4-5-20251001'];
-  const CARTESIA_VOICES = [
-    { id: 'a0e99841-438c-4a64-b679-ae501e7d6091', name: 'Barbershop Man',       lang: 'English', gender: 'Male'   },
-    { id: '156fb8d2-335b-4950-9cb3-a2d33befec77', name: 'Helpful Woman',        lang: 'English', gender: 'Female' },
-    { id: 'e00d0e4c-a5c8-443f-a8a3-473eb9a62355', name: 'Friendly Sidekick',   lang: 'English', gender: 'Male'   },
-    { id: 'cd17ff2d-5ea4-4695-be8f-42193949b946', name: 'Meditation Lady',      lang: 'English', gender: 'Female' },
-    { id: 'b7d50908-b17c-442d-ad8d-810c63997ed9', name: 'California Girl',      lang: 'English', gender: 'Female' },
-    { id: '846fa30b-6e1a-49b9-b7df-6be47092a09a', name: 'Storyteller Man',     lang: 'Spanish', gender: 'Male'   },
-    { id: '5c5ad5e7-1020-476b-8b91-fdcbe9cc313c', name: 'Mexican Woman',        lang: 'Spanish', gender: 'Female' },
-    { id: '65b25c5d-ff07-4687-a04c-da2f43ef6fa9', name: 'French Helpful Lady', lang: 'French',  gender: 'Female' },
-    { id: '29e5f8b4-b953-4160-848f-40fae182235b', name: 'Korean Calm Woman',   lang: 'Korean',  gender: 'Female' },
-  ];
-
   // Accept any model string
   const validateModel = (m: string | undefined): string => {
     if (m) return m;
@@ -141,19 +127,7 @@ const AIProfileScreen: React.FC = () => {
     setIsTestingVoice(true);
     const text = `Hello! I am ${name}. This is an example of how I sound.`;
 
-    if (voiceProvider === 'async' && asyncVoiceId) {
-      try {
-        const audioBlob = await generateAsyncSpeech(text, asyncVoiceId, asyncApiKey);
-        const audioUrl = URL.createObjectURL(audioBlob);
-        const audio = new Audio(audioUrl);
-        audio.onended = () => { setIsTestingVoice(false); URL.revokeObjectURL(audioUrl); };
-        audio.onerror = () => { setIsTestingVoice(false); URL.revokeObjectURL(audioUrl); };
-        audio.play().catch(() => setIsTestingVoice(false));
-      } catch (error: any) {
-        addToast({ title: "Voice Error", message: error.message || "Async TTS failed.", type: "error" });
-        setIsTestingVoice(false);
-      }
-    } else if (voiceProvider === 'elevenlabs' && elevenLabsVoiceId) {
+    if (voiceProvider === 'elevenlabs' && elevenLabsVoiceId) {
       try {
         const audioBlob = await generateElevenLabsSpeech(text, elevenLabsVoiceId, elevenLabsApiKey, elevenLabsModelId, {
           stability: elStability, similarityBoost: elSimilarity, style: elStyle,
@@ -166,24 +140,6 @@ const AIProfileScreen: React.FC = () => {
         audio.play().catch(() => setIsTestingVoice(false));
       } catch (error: any) {
         addToast({ title: "Voice Error", message: error.message || "ElevenLabs TTS failed.", type: "error" });
-        setIsTestingVoice(false);
-      }
-    } else if (voiceProvider === 'cartesia') {
-      const cVoiceId = cartesiaCustomVoiceId.trim() || cartesiaSelectedVoiceId;
-      if (!cVoiceId) {
-        addToast({ title: "Voice Error", message: "Select or enter a Cartesia voice ID first.", type: "error" });
-        setIsTestingVoice(false);
-        return;
-      }
-      try {
-        const audioBlob = await generateCartesiaSpeech(text, cVoiceId, cartesiaApiKey, 'en', cartesiaSpeed, cartesiaEmotion ? [cartesiaEmotion] : undefined);
-        const audioUrl = URL.createObjectURL(audioBlob);
-        const audio = new Audio(audioUrl);
-        audio.onended = () => { setIsTestingVoice(false); URL.revokeObjectURL(audioUrl); };
-        audio.onerror = () => { setIsTestingVoice(false); URL.revokeObjectURL(audioUrl); };
-        audio.play().catch(() => setIsTestingVoice(false));
-      } catch (error: any) {
-        addToast({ title: "Voice Error", message: error.message || "Cartesia TTS failed.", type: "error" });
         setIsTestingVoice(false);
       }
     } else {
@@ -229,12 +185,7 @@ const AIProfileScreen: React.FC = () => {
     setAutoReadMessages(aiProfile.autoReadMessages || false);
     setVoiceGender(aiProfile.voiceGender || 'none');
     setVoiceDescription(aiProfile.voiceDescription || '');
-    setVoiceProvider((aiProfile.voiceProvider === 'gemini' ? 'browser' : aiProfile.voiceProvider) || 'browser');
-    setAsyncVoiceId(aiProfile.asyncVoiceId || null);
-    if (aiProfile.voiceProvider === 'cartesia') {
-      setCartesiaSelectedVoiceId(aiProfile.asyncVoiceId || '');
-      setCartesiaCustomVoiceId('');
-    }
+    setVoiceProvider((aiProfile.voiceProvider === 'elevenlabs') ? 'elevenlabs' : 'browser');
     setResponseLength(aiProfile.responseLength || 'medium');
     setResponseDetail(aiProfile.responseDetail || 'standard');
     setResponseTone(aiProfile.responseTone || 'friendly');
@@ -262,8 +213,6 @@ const AIProfileScreen: React.FC = () => {
     setElStyle(aiProfile.elStyle             ?? 0);
     setElSpeakerBoost(aiProfile.elSpeakerBoost ?? true);
     setElSpeakingRate(aiProfile.elSpeakingRate  ?? 1.0);
-    setCartesiaSpeed(aiProfile.cartesiaSpeed   ?? 1.0);
-    setCartesiaEmotion(aiProfile.cartesiaEmotion ?? '');
     setDynamicEmotion(aiProfile.dynamicEmotion  ?? false);
     setMaxTokens(aiProfile.maxTokens ?? 2048);
     setKnowsItsAI(aiProfile.knowsItsAI ?? true);
@@ -312,7 +261,6 @@ const AIProfileScreen: React.FC = () => {
       voiceGender,
       voiceDescription,
       voiceProvider,
-      asyncVoiceId,
       responseLength,
       responseDetail,
       responseTone,
@@ -353,8 +301,6 @@ const AIProfileScreen: React.FC = () => {
       elStyle,
       elSpeakerBoost,
       elSpeakingRate,
-      cartesiaSpeed,
-      cartesiaEmotion,
       dynamicEmotion,
       aiCanUseTools: aiProfile.aiCanUseTools,
       aiCanBrowse: aiProfile.aiCanBrowse,
@@ -388,7 +334,6 @@ const AIProfileScreen: React.FC = () => {
       voiceGender,
       voiceDescription,
       voiceProvider,
-      asyncVoiceId,
       responseLength,
       responseDetail,
       responseTone,
@@ -624,7 +569,6 @@ const AIProfileScreen: React.FC = () => {
         voiceGender,
         voiceDescription,
         voiceProvider,
-        asyncVoiceId,
         responseLength,
         responseDetail,
         responseTone,
@@ -697,8 +641,6 @@ const AIProfileScreen: React.FC = () => {
   }, [savePersona, loadPersona]);
 
   const [isLoadingLibraryVoices, setIsLoadingLibraryVoices] = useState(false);
-  const [isLoadingAsyncVoices, setIsLoadingAsyncVoices] = useState(false);
-  const [asyncVoices, setAsyncVoices] = useState<any[]>([]);
   const [elevenLabsVoices, setElevenLabsVoices] = useState<any[]>([]);
   const [isLoadingElevenLabsVoices, setIsLoadingElevenLabsVoices] = useState(false);
   const [elevenLabsVoiceId, setElevenLabsVoiceId] = useState<string>(aiProfile.asyncVoiceId || '');
@@ -708,18 +650,6 @@ const AIProfileScreen: React.FC = () => {
   const [elVoiceTypeFilter, setElVoiceTypeFilter] = useState('');
   const [elSort, setElSort] = useState<'name' | 'created_at_unix'>('name');
   const [elSortDir, setElSortDir] = useState<'asc' | 'desc'>('asc');
-  const [genderFilter, setGenderFilter] = useState<string>('');
-  const [languageFilter, setLanguageFilter] = useState<string>('');
-  const [accentFilter, setAccentFilter] = useState<string>('');
-  const [styleFilter, setStyleFilter] = useState<string>('');
-
-  // Cartesia state
-  const [cartesiaSelectedVoiceId, setCartesiaSelectedVoiceId] = useState<string>(
-    aiProfile.voiceProvider === 'cartesia' ? (aiProfile.asyncVoiceId || '') : ''
-  );
-  const [cartesiaCustomVoiceId, setCartesiaCustomVoiceId] = useState<string>('');
-  const [cartesiaSpeed, setCartesiaSpeed]       = useState<number>(aiProfile.cartesiaSpeed   ?? 1.0);
-  const [cartesiaEmotion, setCartesiaEmotion]   = useState<string>(aiProfile.cartesiaEmotion  ?? '');
   const [dynamicEmotion, setDynamicEmotion]     = useState<boolean>(aiProfile.dynamicEmotion  ?? false);
 
   // ElevenLabs voice quality settings
@@ -774,63 +704,6 @@ const AIProfileScreen: React.FC = () => {
     mediaRecorderRef.current?.stop();
     if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
   };
-
-  const handleCloneVoice = async () => {
-    if (!cloneAudioFile) { addToast({ title: "No Audio", message: "Record or upload an audio sample first.", type: "warning" }); return; }
-    if (!cloneName.trim()) { addToast({ title: "Name Required", message: "Give your cloned voice a name.", type: "warning" }); return; }
-    setIsCloning(true);
-    addToast({ title: "Cloning Voice", message: "Uploading audio sample to Async…", type: "info" });
-    try {
-      const result = await cloneAsyncVoice(cloneAudioFile, {
-        name: cloneName.trim(),
-        gender: cloneGender,
-        enhance: cloneEnhance,
-      }, asyncApiKey);
-      // Auto-select the new cloned voice
-      setAsyncVoiceId(result.id);
-      setAIProfile({ ...aiProfile, asyncVoiceId: result.id, voiceProvider: 'async' });
-      setVoiceProvider('async');
-      addToast({ title: "Voice Cloned!", message: `"${result.name}" is ready. It's been selected as your active voice.`, type: "success" });
-      // Refresh voice list so it appears
-      fetchAsyncVoices();
-      setShowClonePanel(false);
-      setCloneName('');
-      setCloneAudioFile(null);
-    } catch (e: any) {
-      addToast({ title: "Clone Failed", message: e.message || "Voice cloning failed.", type: "error" });
-    } finally {
-      setIsCloning(false);
-    }
-  };
-
-  const fetchAsyncVoices = useCallback(async () => {
-    setIsLoadingAsyncVoices(true);
-    try {
-        const params: any = { limit: 100 };
-        if (genderFilter) params.gender = genderFilter;
-        if (languageFilter) params.language = languageFilter;
-        if (accentFilter) params.accent = accentFilter;
-        if (styleFilter) params.style = styleFilter;
-        const voices = await listAsyncVoices(params, asyncApiKey);
-        setAsyncVoices(voices);
-    } catch (error) {
-        console.error("Error fetching Async voices:", error);
-        addToast({ title: "Error", message: "Failed to load Async voices.", type: "error" });
-    } finally {
-        setIsLoadingAsyncVoices(false);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [genderFilter, languageFilter, accentFilter, styleFilter, asyncApiKey]);
-
-  // Fetch voices when switching to async provider, or when filters change.
-  // fetchAsyncVoices intentionally omitted from deps to prevent infinite loop
-  // (addToast gets a new reference on every render).
-  useEffect(() => {
-    if (voiceProvider === 'async' && asyncApiKey) {
-        fetchAsyncVoices();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [genderFilter, languageFilter, accentFilter, styleFilter, voiceProvider, asyncApiKey]);
 
   const fetchElevenLabsVoices = useCallback(async () => {
     if (!elevenLabsApiKey) return;
@@ -1519,18 +1392,7 @@ const AIProfileScreen: React.FC = () => {
                                         <Volume2 className="w-3 h-3 mr-1" />
                                         Browser
                                     </button>
-                                    <button 
-                                        onClick={() => {
-                                            setVoiceProvider('async');
-                                            setAIProfile({ ...aiProfile, voiceProvider: 'async', aiCanGenerateSpeech: aiCanGenerateSpeech });
-                                            if (asyncVoices.length === 0) fetchAsyncVoices();
-                                        }}
-                                        className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center justify-center ${voiceProvider === 'async' ? 'bg-white dark:bg-indigo-800 text-indigo-600 dark:text-indigo-100 shadow-sm' : 'text-indigo-400 dark:text-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-300'}`}
-                                    >
-                                        <Mic className="w-3 h-3 mr-1" />
-                                        Async
-                                    </button>
-                                    <button 
+                                    <button
                                         onClick={() => {
                                             setVoiceProvider('elevenlabs');
                                             setAIProfile({ ...aiProfile, voiceProvider: 'elevenlabs', aiCanGenerateSpeech: aiCanGenerateSpeech });
@@ -1541,261 +1403,14 @@ const AIProfileScreen: React.FC = () => {
                                         <Headphones className="w-3 h-3 mr-1" />
                                         ElevenLabs
                                     </button>
-                                    <button 
-                                        onClick={() => {
-                                            setVoiceProvider('cartesia');
-                                            setAIProfile({ ...aiProfile, voiceProvider: 'cartesia', aiCanGenerateSpeech: aiCanGenerateSpeech });
-                                        }}
-                                        className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center justify-center ${voiceProvider === 'cartesia' ? 'bg-white dark:bg-indigo-800 text-indigo-600 dark:text-indigo-100 shadow-sm' : 'text-indigo-400 dark:text-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-300'}`}
-                                    >
-                                        <Mic className="w-3 h-3 mr-1" />
-                                        Cartesia
-                                    </button>
                                 </div>
                                 <p className="mt-2 text-[10px] text-indigo-500 dark:text-indigo-400">
-                                    {voiceProvider === 'async' && "High-quality Async API voices. Requires an Async API key in Settings."}
                                     {voiceProvider === 'elevenlabs' && "Premium ElevenLabs voices. Requires an ElevenLabs API key in Settings."}
                                     {voiceProvider === 'browser' && "Uses your device's built-in speech engine. No API key required."}
-                                    {voiceProvider === 'cartesia' && "Ultra-realistic Cartesia Sonic-3 voices. Requires a Cartesia API key in Settings."}
                                 </p>
                             </div>
 
-                            {voiceProvider === 'async' ? (
-                                <div className="p-4 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 rounded-lg space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                                    <div className="flex items-center justify-between">
-                                        <label className="block text-sm font-bold text-indigo-900 dark:text-indigo-100">Async Voices</label>
-                                        <button 
-                                            onClick={fetchAsyncVoices}
-                                            className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline flex items-center"
-                                        >
-                                            <RotateCcw className="w-3 h-3 mr-1" />
-                                            Refresh List
-                                        </button>
-                                    </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                        <select className="text-xs p-1 rounded border border-indigo-200 dark:border-indigo-700 bg-white dark:bg-indigo-950 text-indigo-900 dark:text-indigo-100" value={genderFilter} onChange={(e) => setGenderFilter(e.target.value)}>
-                                            <option value="">Gender</option>
-                                            <option value="Male">Male</option>
-                                            <option value="Female">Female</option>
-                                            <option value="Neutral">Neutral</option>
-                                            <option value="Unspecified">Unspecified</option>
-                                        </select>
-                                        <select className="text-xs p-1 rounded border border-indigo-200 dark:border-indigo-700 bg-white dark:bg-indigo-950 text-indigo-900 dark:text-indigo-100" value={languageFilter} onChange={(e) => setLanguageFilter(e.target.value)}>
-                                            <option value="">Language</option>
-                                            <option value="en">English</option>
-                                            <option value="fr">French</option>
-                                            <option value="es">Spanish</option>
-                                            <option value="de">German</option>
-                                            <option value="it">Italian</option>
-                                            <option value="pt">Portuguese</option>
-                                            <option value="nl">Dutch</option>
-                                            <option value="ar">Arabic</option>
-                                            <option value="ru">Russian</option>
-                                            <option value="ja">Japanese</option>
-                                            <option value="zh">Chinese</option>
-                                            <option value="hi">Hindi</option>
-                                            <option value="tr">Turkish</option>
-                                            <option value="ro">Romanian</option>
-                                            <option value="he">Hebrew</option>
-                                            <option value="hy">Armenian</option>
-                                        </select>
-                                        <select className="text-xs p-1 rounded border border-indigo-200 dark:border-indigo-700 bg-white dark:bg-indigo-950 text-indigo-900 dark:text-indigo-100" value={accentFilter} onChange={(e) => setAccentFilter(e.target.value)}>
-                                            <option value="">Accent</option>
-                                            <optgroup label="English" className="bg-white dark:bg-indigo-950">
-                                                <option value="American (US)">American (General)</option>
-                                                <option value="American (US) - Atlanta">American (Atlanta)</option>
-                                                <option value="American (US) - Boston">American (Boston)</option>
-                                                <option value="American (US) - Chicago">American (Chicago)</option>
-                                                <option value="American (US) - Colorado">American (Colorado)</option>
-                                                <option value="American (US) - New York">American (New York)</option>
-                                                <option value="American (US) - Southern/Texan">American (Southern/Texan)</option>
-                                                <option value="British (UK)">British (General)</option>
-                                                <option value="British (UK) - Cockney">British (Cockney)</option>
-                                                <option value="British (UK) - Posh/Elegant">British (Posh/Elegant)</option>
-                                                <option value="Australian (AU)">Australian</option>
-                                                <option value="Canadian (CA)">Canadian</option>
-                                                <option value="New Zealand (NZ)">New Zealand</option>
-                                                <option value="Irish (IE)">Irish</option>
-                                                <option value="Scottish (GB)">Scottish</option>
-                                                <option value="Welsh (GB)">Welsh</option>
-                                                <option value="Indian (IN)">Indian English</option>
-                                                <option value="African (AF)">African</option>
-                                                <option value="Nigerian (NG)">Nigerian</option>
-                                            </optgroup>
-                                            <optgroup label="Spanish" className="bg-white dark:bg-indigo-950">
-                                                <option value="Spanish (ES)">Spanish (General)</option>
-                                                <option value="Spanish (ES) - Castilian">Spanish (Castilian)</option>
-                                                <option value="Spanish (ES) - Latin American">Spanish (Latin American)</option>
-                                            </optgroup>
-                                            <optgroup label="Other" className="bg-white dark:bg-indigo-950">
-                                                <option value="Italian (IT)">Italian</option>
-                                                <option value="Japanese (JP)">Japanese</option>
-                                                <option value="Portuguese (PT)">Portuguese</option>
-                                                <option value="Romanian (RO)">Romanian</option>
-                                                <option value="Russian (RU)">Russian</option>
-                                                <option value="Swedish (SE)">Swedish</option>
-                                                <option value="Turkish (TR)">Turkish</option>
-                                            </optgroup>
-                                        </select>
-                                        <select className="text-xs p-1 rounded border border-indigo-200 dark:border-indigo-700 bg-white dark:bg-indigo-950 text-indigo-900 dark:text-indigo-100" value={styleFilter} onChange={(e) => setStyleFilter(e.target.value)}>
-                                            <option value="">Style</option>
-                                            <option value="Strong Accents">Strong Accents</option>
-                                            <option value="Movie trailer">Movie trailer</option>
-                                            <option value="Impersonation">Impersonation</option>
-                                            <option value="Character">Character</option>
-                                            <option value="IVR">IVR</option>
-                                            <option value="Commercial / Advertisement">Commercial / Ad</option>
-                                            <option value="Storytelling">Storytelling</option>
-                                            <option value="Motivational">Motivational</option>
-                                            <option value="Newscasting">Newscasting</option>
-                                            <option value="Podcast">Podcast</option>
-                                            <option value="Informative / Educational">Educational</option>
-                                            <option value="Audiobook">Audiobook</option>
-                                        </select>
-                                    </div>
-                                    <div className="max-h-40 overflow-y-auto border border-indigo-100 dark:border-indigo-800 rounded bg-white dark:bg-indigo-950 divide-y divide-indigo-50 dark:divide-indigo-900">
-                                        {isLoadingAsyncVoices ? (
-                                            <div className="p-4 flex justify-center">
-                                                <Loader2 className="w-5 h-5 text-indigo-600 dark:text-indigo-400 animate-spin" />
-                                            </div>
-                                        ) : asyncVoices.length > 0 ? (
-                                            asyncVoices.map((v: any) => (
-                                                <div 
-                                                    key={v.voice_id} 
-                                                    className={`p-3 flex items-center justify-between hover:bg-indigo-50/50 dark:hover:bg-indigo-900/50 cursor-pointer transition-colors ${aiProfile.asyncVoiceId === v.voice_id ? 'bg-indigo-50 dark:bg-indigo-900' : ''}`}
-                                                    onClick={() => {
-                                                        setAIProfile({ ...aiProfile, asyncVoiceId: v.voice_id });
-                                                        setAsyncVoiceId(v.voice_id);
-                                                    }}
-                                                >
-                                                    <div className="flex-1 min-w-0">
-                                                        <span className="text-sm font-bold text-indigo-900 dark:text-indigo-100 truncate">{v.name}</span>
-                                                    </div>
-                                                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${aiProfile.asyncVoiceId === v.voice_id ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-600 dark:bg-indigo-500' : 'border-indigo-300 dark:border-indigo-700'}`}>
-                                                        {aiProfile.asyncVoiceId === v.voice_id && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                                                    </div>
-                                                </div>
-                                            ))
-                                        ) : (
-                                            <div className="p-4 text-center text-xs text-indigo-500 dark:text-indigo-400">No voices found.</div>
-                                        )}
-                                    </div>
-                                    <div className="flex justify-center">
-                                        <button
-                                            onClick={handleTestVoice}
-                                            disabled={isTestingVoice || !asyncVoiceId}
-                                            className="flex items-center space-x-2 py-2 px-6 bg-indigo-600 text-white rounded-full text-sm font-medium hover:bg-indigo-700 transition-all disabled:opacity-50 shadow-md"
-                                        >
-                                            {isTestingVoice ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                                            <span>Test Async Voice</span>
-                                        </button>
-                                    </div>
-
-                                    {/* ── Voice Clone Panel ── */}
-                                    <div className="border-t border-indigo-100 dark:border-indigo-800 pt-4 mt-2">
-                                        <button
-                                            onClick={() => setShowClonePanel(!showClonePanel)}
-                                            className="w-full flex items-center justify-between text-sm font-medium text-indigo-700 dark:text-indigo-300 py-2"
-                                        >
-                                            <span>Clone a Voice</span>
-                                            <span className="text-xs text-indigo-400">{showClonePanel ? 'Hide' : 'Show'}</span>
-                                        </button>
-
-                                        {showClonePanel && (
-                                            <div className="mt-3 space-y-4 p-4 bg-indigo-50 dark:bg-indigo-900/40 rounded-xl border border-indigo-100 dark:border-indigo-800">
-                                                <p className="text-xs text-indigo-500 dark:text-indigo-400">
-                                                    Record or upload at least 3 seconds of clear speech to clone a voice. Max 10MB. Supported formats: wav, mp3, flac, aiff.
-                                                </p>
-
-                                                {/* Audio source */}
-                                                <div className="flex gap-2">
-                                                    <button
-                                                        onClick={isRecording ? handleStopRecording : handleStartRecording}
-                                                        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium transition-colors ${isRecording ? 'bg-red-500 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
-                                                    >
-                                                        <Mic className="w-4 h-4" />
-                                                        {isRecording ? `Stop (${recordingSeconds}s)` : 'Record'}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => cloneFileInputRef.current?.click()}
-                                                        className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium bg-indigo-100 dark:bg-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-700 transition-colors"
-                                                    >
-                                                        <Upload className="w-4 h-4" />
-                                                        Upload
-                                                    </button>
-                                                    <input
-                                                        ref={cloneFileInputRef}
-                                                        type="file"
-                                                        accept="audio/wav,audio/mp3,audio/mpeg,audio/flac,audio/aiff,.wav,.mp3,.flac,.aiff"
-                                                        className="hidden"
-                                                        onChange={(e) => {
-                                                            const f = e.target.files?.[0];
-                                                            if (f) { setCloneAudioFile(f); addToast({ title: "Audio Ready", message: f.name, type: "success" }); }
-                                                        }}
-                                                    />
-                                                </div>
-
-                                                {cloneAudioFile && (
-                                                    <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-                                                        <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
-                                                        {cloneAudioFile.name} ({(cloneAudioFile.size / 1024).toFixed(0)} KB)
-                                                    </p>
-                                                )}
-
-                                                {/* Voice name */}
-                                                <div>
-                                                    <label className="block text-xs font-medium text-indigo-700 dark:text-indigo-300 mb-1">Voice Name (required)</label>
-                                                    <input
-                                                        type="text"
-                                                        value={cloneName}
-                                                        onChange={(e) => setCloneName(e.target.value)}
-                                                        placeholder="e.g. My Voice"
-                                                        className="w-full p-2 border border-indigo-300 dark:border-indigo-700 rounded-lg bg-white dark:bg-indigo-950 text-indigo-900 dark:text-indigo-100 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                                                    />
-                                                </div>
-
-                                                {/* Gender + enhance */}
-                                                <div className="flex gap-3 items-end">
-                                                    <div className="flex-1">
-                                                        <label className="block text-xs font-medium text-indigo-700 dark:text-indigo-300 mb-1">Gender</label>
-                                                        <select
-                                                            value={cloneGender}
-                                                            onChange={(e) => setCloneGender(e.target.value as any)}
-                                                            className="w-full p-2 border border-indigo-300 dark:border-indigo-700 rounded-lg bg-white dark:bg-indigo-950 text-indigo-900 dark:text-indigo-100 text-sm"
-                                                        >
-                                                            <option value="Unspecified">Unspecified</option>
-                                                            <option value="Male">Male</option>
-                                                            <option value="Female">Female</option>
-                                                            <option value="Neutral">Neutral</option>
-                                                        </select>
-                                                    </div>
-                                                    <div className="flex items-center gap-2 pb-2">
-                                                        <label className="text-xs font-medium text-indigo-700 dark:text-indigo-300">Enhance audio</label>
-                                                        <button
-                                                            onClick={() => setCloneEnhance(!cloneEnhance)}
-                                                            className={`w-9 h-5 rounded-full transition-colors ${cloneEnhance ? 'bg-indigo-600' : 'bg-indigo-200 dark:bg-indigo-800'}`}
-                                                        >
-                                                            <div className={`w-3 h-3 rounded-full bg-white transition-transform mx-auto ${cloneEnhance ? 'translate-x-2' : '-translate-x-2'}`} />
-                                                        </button>
-                                                    </div>
-                                                </div>
-
-                                                <p className="text-[10px] text-indigo-400 dark:text-indigo-500">Enhance removes background noise before cloning — recommended.</p>
-
-                                                {/* Clone button */}
-                                                <button
-                                                    onClick={handleCloneVoice}
-                                                    disabled={isCloning || !cloneAudioFile || !cloneName.trim()}
-                                                    className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                                                >
-                                                    {isCloning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}
-                                                    {isCloning ? 'Cloning…' : 'Clone Voice'}
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            ) : voiceProvider === 'elevenlabs' ? (
+                            {voiceProvider === 'elevenlabs' ? (
                                 <div className="p-4 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 rounded-lg space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
                                     <div className="flex items-center justify-between">
                                         <label className="block text-sm font-bold text-indigo-900 dark:text-indigo-100">ElevenLabs Voices</label>
@@ -1962,118 +1577,6 @@ const AIProfileScreen: React.FC = () => {
                                             <button
                                                 onClick={() => setDynamicEmotion(!dynamicEmotion)}
                                                 data-testid="el-dynamic-style-toggle"
-                                                className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${dynamicEmotion ? 'bg-indigo-600' : 'bg-indigo-200 dark:bg-indigo-800'}`}>
-                                                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${dynamicEmotion ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : voiceProvider === 'cartesia' ? (
-                                <div className="p-4 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 rounded-lg space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                                    <label className="block text-sm font-bold text-indigo-900 dark:text-indigo-100">Cartesia Voices</label>
-
-                                    {/* Static voice list */}
-                                    <div className="space-y-1">
-                                        {CARTESIA_VOICES.map((v) => (
-                                            <div
-                                                key={v.id}
-                                                onClick={() => {
-                                                    setCartesiaSelectedVoiceId(v.id);
-                                                    setCartesiaCustomVoiceId('');
-                                                    setAsyncVoiceId(v.id);
-                                                    setAIProfile({ ...aiProfile, asyncVoiceId: v.id, voiceProvider: 'cartesia' });
-                                                }}
-                                                className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${cartesiaSelectedVoiceId === v.id && !cartesiaCustomVoiceId ? 'bg-indigo-200 dark:bg-indigo-700' : 'hover:bg-indigo-100 dark:hover:bg-indigo-800'}`}
-                                                data-testid={`cartesia-voice-${v.id}`}
-                                            >
-                                                <div className="flex-1 min-w-0">
-                                                    <span className="text-sm font-semibold text-indigo-900 dark:text-indigo-100">{v.name}</span>
-                                                    <span className="text-[10px] text-indigo-400 dark:text-indigo-500 ml-2">{v.lang} · {v.gender}</span>
-                                                </div>
-                                                <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ml-2 ${cartesiaSelectedVoiceId === v.id && !cartesiaCustomVoiceId ? 'border-indigo-600 bg-indigo-600' : 'border-indigo-300 dark:border-indigo-700'}`}>
-                                                    {cartesiaSelectedVoiceId === v.id && !cartesiaCustomVoiceId && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    <div className="flex justify-center">
-                                        <button
-                                            onClick={handleTestVoice}
-                                            disabled={isTestingVoice || (!cartesiaSelectedVoiceId && !cartesiaCustomVoiceId)}
-                                            className="flex items-center space-x-2 py-2 px-6 bg-indigo-600 text-white rounded-full text-sm font-medium hover:bg-indigo-700 transition-all disabled:opacity-50 shadow-md"
-                                            data-testid="cartesia-test-voice-btn"
-                                        >
-                                            {isTestingVoice ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                                            <span>Test Cartesia Voice</span>
-                                        </button>
-                                    </div>
-
-                                    {/* Custom Voice ID */}
-                                    <div className="border-t border-indigo-100 dark:border-indigo-800 pt-3">
-                                        <label className="block text-xs font-medium text-indigo-700 dark:text-indigo-300 mb-1">Custom Voice ID</label>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="text"
-                                                value={cartesiaCustomVoiceId}
-                                                onChange={(e) => setCartesiaCustomVoiceId(e.target.value)}
-                                                placeholder="Paste a Cartesia voice UUID"
-                                                className="flex-1 p-2 border border-indigo-300 dark:border-indigo-700 rounded-lg bg-white dark:bg-indigo-950 text-indigo-900 dark:text-indigo-100 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                                                data-testid="cartesia-custom-voice-id-input"
-                                            />
-                                            <button
-                                                onClick={() => {
-                                                    const id = cartesiaCustomVoiceId.trim();
-                                                    if (!id) return;
-                                                    setCartesiaSelectedVoiceId('');
-                                                    setAsyncVoiceId(id);
-                                                    setAIProfile({ ...aiProfile, asyncVoiceId: id, voiceProvider: 'cartesia' });
-                                                    addToast({ title: 'Voice Set', message: 'Custom Cartesia voice ID saved.', type: 'success' });
-                                                }}
-                                                className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
-                                                data-testid="cartesia-custom-voice-use-btn"
-                                            >
-                                                Use
-                                            </button>
-                                        </div>
-                                        <p className="text-[10px] text-indigo-400 dark:text-indigo-500 mt-1">
-                                            Find more voices at <a href="https://play.cartesia.ai" target="_blank" rel="noreferrer" className="underline">play.cartesia.ai</a>. Requires a Cartesia API key in Settings.
-                                        </p>
-                                    </div>
-
-                                    {/* Cartesia speed & emotion settings */}
-                                    <div className="border-t border-indigo-100 dark:border-indigo-800 pt-3 space-y-3">
-                                        <label className="block text-xs font-semibold text-indigo-700 dark:text-indigo-300">Voice Settings</label>
-                                        <div>
-                                            <label className="block text-[11px] font-medium text-indigo-700 dark:text-indigo-300 mb-1">Speed: {cartesiaSpeed.toFixed(2)}x</label>
-                                            <input type="range" min="0.5" max="2.0" step="0.05" value={cartesiaSpeed}
-                                                onChange={(e) => setCartesiaSpeed(parseFloat(e.target.value))}
-                                                className="w-full h-1.5 bg-indigo-200 dark:bg-indigo-800 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-                                                data-testid="cartesia-speed-slider" />
-                                            <div className="flex justify-between text-[10px] text-indigo-400 mt-0.5"><span>Slow (0.5x)</span><span>Fast (2x)</span></div>
-                                        </div>
-                                        <div>
-                                            <label className="block text-[11px] font-medium text-indigo-700 dark:text-indigo-300 mb-1">Emotion</label>
-                                            <select value={cartesiaEmotion} onChange={(e) => setCartesiaEmotion(e.target.value)}
-                                                className="w-full p-1.5 border border-indigo-300 dark:border-indigo-700 rounded-md bg-white dark:bg-indigo-900 text-indigo-900 dark:text-indigo-100 text-xs"
-                                                data-testid="cartesia-emotion-select">
-                                                <option value="">None (neutral)</option>
-                                                <option value="positivity:high">Happy / Positive</option>
-                                                <option value="positivity:low">Sad / Negative</option>
-                                                <option value="curiosity:high">Curious</option>
-                                                <option value="surprise:high">Surprised</option>
-                                                <option value="anger:high">Angry</option>
-                                                <option value="sadness:high">Deeply Sad</option>
-                                            </select>
-                                        </div>
-                                        <div className="flex items-center justify-between pt-1">
-                                            <div>
-                                                <label className="text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">Dynamic Emotion</label>
-                                                <p className="text-[10px] text-indigo-400 leading-tight">Auto-adapt voice emotion to match the AI's reply tone</p>
-                                            </div>
-                                            <button
-                                                onClick={() => setDynamicEmotion(!dynamicEmotion)}
-                                                data-testid="dynamic-emotion-toggle"
                                                 className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${dynamicEmotion ? 'bg-indigo-600' : 'bg-indigo-200 dark:bg-indigo-800'}`}>
                                                 <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${dynamicEmotion ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                             </button>

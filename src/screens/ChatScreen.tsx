@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Send, Image as ImageIcon, Mic, Paperclip, Volume2, RotateCcw, Edit2, X, FileText, CheckCheck, Loader2, Camera, Trash2, ExternalLink, Plus, MessageSquare, History, MoreVertical, ChevronLeft, ChevronRight, Search, Star, Headphones, ArrowDown, Sparkles } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useChat } from '../context/ChatContext';
-import { generateAsyncSpeech, generateElevenLabsSpeech, generateCartesiaSpeech } from '../services/asyncService';
+import { generateElevenLabsSpeech } from '../services/asyncService';
 import { showNativeNotification } from '../services/notificationService';
 import ChatMessageItem from '../components/ChatMessageItem';
 import ImageModal from '../components/ImageModal';
@@ -13,9 +13,8 @@ import { performOCR, processFile } from '../services/ocrService';
 const ChatScreen: React.FC = () => {
   const { 
     aiProfile, userProfile, knowledgeBase, 
-    addToKnowledgeBase, addToGallery, apiKey, asyncApiKey,
-    anthropicApiKey, geminiApiKey, elevenLabsApiKey, kaggleApiKey,
-    cartesiaApiKey,
+    addToKnowledgeBase, addToGallery, apiKey,
+    anthropicApiKey, geminiApiKey, elevenLabsApiKey,
     memories, journal, 
     addJournalEntry, addMemory, showTimestamps, timeZone, addToast,
     setAIProfile, setLastInteractionTime
@@ -232,22 +231,22 @@ const ChatScreen: React.FC = () => {
   };
 
   // ── Emotion detection from AI reply text ─────────────────────────────────
-  const detectEmotion = (text: string): { cartesiaEmotion: string; elStyle: number } => {
+  const detectEmotion = (text: string): { elStyle: number } => {
     const t = text.toLowerCase();
     // Happy / excited signals
     if (/(!{2,}|😄|😊|😁|great news|wonderful|excited|congratul|absolutely|love that|fantastic|so happy|amazing)/i.test(t))
-      return { cartesiaEmotion: 'positivity:high', elStyle: 0.7 };
+      return { elStyle: 0.7 };
     // Curious / inquisitive
     if (/(\?{2,}|curious|interesting|wonder|tell me more|what do you think|fascinating|i\'m intrigued)/i.test(t))
-      return { cartesiaEmotion: 'curiosity:high', elStyle: 0.5 };
+      return { elStyle: 0.5 };
     // Sad / empathetic
     if (/(sorry to hear|that must be|how difficult|understand.*pain|I\'m sorry|unfortunately|tough situation|hard time)/i.test(t))
-      return { cartesiaEmotion: 'sadness:high', elStyle: 0.4 };
+      return { elStyle: 0.4 };
     // Surprised
     if (/(wow|that\'s surprising|didn\'t expect|really\?|no way|unbelievable|shocking)/i.test(t))
-      return { cartesiaEmotion: 'surprise:high', elStyle: 0.6 };
+      return { elStyle: 0.6 };
     // Default: neutral
-    return { cartesiaEmotion: '', elStyle: aiProfile.elStyle ?? 0 };
+    return { elStyle: aiProfile.elStyle ?? 0 };
   };
 
   // Text to Speech
@@ -268,29 +267,6 @@ const ChatScreen: React.FC = () => {
           useSpeakerBoost: aiProfile.elSpeakerBoost,
           speakingRate:    aiProfile.elSpeakingRate,
         });
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        audio.onended = () => { onEnd(); URL.revokeObjectURL(url); };
-        audio.onerror = () => { URL.revokeObjectURL(url); speakWithBrowser(text, messageId); };
-        audio.play();
-      } catch {
-        speakWithBrowser(text, messageId);
-      }
-    } else if (aiProfile.voiceProvider === 'cartesia' && aiProfile.asyncVoiceId) {
-      const emotion = emotionOverride?.cartesiaEmotion ?? aiProfile.cartesiaEmotion;
-      try {
-        const blob = await generateCartesiaSpeech(text, aiProfile.asyncVoiceId, cartesiaApiKey, 'en', aiProfile.cartesiaSpeed, emotion ? [emotion] : undefined);
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        audio.onended = () => { onEnd(); URL.revokeObjectURL(url); };
-        audio.onerror = () => { URL.revokeObjectURL(url); speakWithBrowser(text, messageId); };
-        audio.play();
-      } catch {
-        speakWithBrowser(text, messageId);
-      }
-    } else if (aiProfile.voiceProvider === 'async' && aiProfile.asyncVoiceId) {
-      try {
-        const blob = await generateAsyncSpeech(text, aiProfile.asyncVoiceId, asyncApiKey);
         const url = URL.createObjectURL(blob);
         const audio = new Audio(url);
         audio.onended = () => { onEnd(); URL.revokeObjectURL(url); };

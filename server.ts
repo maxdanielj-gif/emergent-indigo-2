@@ -2,7 +2,6 @@ import express from "express";
 import cors from "cors";
 import compression from "compression";
 import { createServer as createViteServer } from "vite";
-import { WebSocketServer, WebSocket } from "ws";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import path from "path";
@@ -476,50 +475,6 @@ app.post("/api/notifications/test", express.json(), async (req, res) => {
   }
 });
 
-// ── Async TTS endpoints ───────────────────────────────────────────────────────
-// Simple HTTP TTS — full text in, mp3 out. No WebSocket needed.
-app.post("/api/tts/generate", express.json(), async (req, res) => {
-  const { text, voiceId, apiKey: userApiKey } = req.body;
-  if (!text || !voiceId) return res.status(400).json({ error: "Missing text or voiceId" });
-
-  const apiKey = userApiKey || process.env.ASYNC_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: "Async API key not configured" });
-
-  try {
-    const response = await fetch("https://api.async.com/text_to_speech", {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "version": "v1",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model_id: "async_flash_v1.0",
-        transcript: text,
-        voice: { mode: "id", id: voiceId },
-        output_format: { container: "mp3", sample_rate: 44100 },
-      }),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error(`Async TTS error: ${response.status} ${errText}`);
-      return res.status(response.status).json({ error: `Async TTS error: ${errText || response.statusText}` });
-    }
-
-    res.setHeader("Content-Type", "audio/mpeg");
-    if (response.body) {
-      (Readable as any).fromWeb(response.body).pipe(res);
-    } else {
-      res.status(500).json({ error: "No audio returned from Async API" });
-    }
-  } catch (e: any) {
-    console.error("TTS generate error:", e);
-    res.status(500).json({ error: e.message || "Failed to generate speech" });
-  }
-});
-
-
 // ── ElevenLabs TTS ────────────────────────────────────────────────────────────
 app.post("/api/tts/elevenlabs", express.json(), async (req, res) => {
   const { text, voiceId, apiKey: userApiKey, modelId, stability, similarityBoost, style, useSpeakerBoost, speakingRate } = req.body;
@@ -646,154 +601,6 @@ app.get("/api/tts/elevenlabs/voices", async (req, res) => {
   } catch (e: any) {
     console.error("ElevenLabs voices error:", e);
     res.status(500).json({ error: e.message || "Failed to fetch ElevenLabs voices" });
-  }
-});
-
-// ── Cartesia TTS ──────────────────────────────────────────────────────────────
-app.post("/api/tts/cartesia", express.json(), async (req, res) => {
-  const { text, voiceId, apiKey: userApiKey, language, speed, emotions } = req.body;
-  if (!text || !voiceId) return res.status(400).json({ error: "Missing text or voiceId" });
-
-  const apiKey = userApiKey || process.env.CARTESIA_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: "Cartesia API key not configured" });
-
-  try {
-    const cartesiaBody: any = {
-      model_id: "sonic-3",
-      transcript: text,
-      voice: { mode: "id", id: voiceId },
-      output_format: { container: "mp3", encoding: "mp3", sample_rate: 24000 },
-      language: language || "en",
-    };
-    if (speed    != null) cartesiaBody.speed    = speed;
-    if (emotions?.length) cartesiaBody.emotions = emotions;
-
-    const response = await fetch("https://api.cartesia.ai/tts/bytes", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Cartesia-Version": "2025-04-16",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(cartesiaBody),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error(`Cartesia TTS error: ${response.status} ${errText}`);
-      return res.status(response.status).json({ error: `Cartesia error: ${errText || response.statusText}` });
-    }
-
-    res.setHeader("Content-Type", "audio/mpeg");
-    if (response.body) {
-      (Readable as any).fromWeb(response.body).pipe(res);
-    } else {
-      res.status(500).json({ error: "No audio returned from Cartesia" });
-    }
-  } catch (e: any) {
-    console.error("Cartesia TTS error:", e);
-    res.status(500).json({ error: e.message || "Failed to generate speech" });
-  }
-});
-
-// ── Async: clone voice ────────────────────────────────────────────────────────
-app.post("/api/voices/clone", async (req, res) => {
-  // This endpoint receives a base64-encoded audio file + metadata from the client,
-  // rebuilds a multipart/form-data request, and forwards it to Async.
-  const { audioBase64, audioMimeType, audioFileName, name, description, accent, gender, style, enhance, transcript, apiKey: userApiKey } = req.body;
-
-  const apiKey = userApiKey || process.env.ASYNC_API_KEY;
-  if (!apiKey) return res.status(400).json({ error: "Async API key not configured." });
-  if (!audioBase64 || !name) return res.status(400).json({ error: "Audio and voice name are required." });
-
-  try {
-    // Rebuild the audio file from base64
-    const audioBuffer = Buffer.from(audioBase64, "base64");
-    const fileName = audioFileName || "voice_sample.wav";
-
-    // Build multipart form using Node's built-in approach
-    const boundary = `----AsyncVoiceClone${Date.now()}`;
-    const CRLF = "\r\n";
-
-    const addField = (name: string, value: string) =>
-      `--${boundary}${CRLF}Content-Disposition: form-data; name="${name}"${CRLF}${CRLF}${value}${CRLF}`;
-
-    let formBody = "";
-    formBody += addField("name", name);
-    if (description) formBody += addField("description", description);
-    if (accent)      formBody += addField("accent", accent);
-    if (gender)      formBody += addField("gender", gender);
-    if (style)       formBody += addField("style", style);
-    if (transcript)  formBody += addField("transcript", transcript);
-    if (enhance)     formBody += addField("enhance", "true");
-
-    // File field
-    const filePart = `--${boundary}${CRLF}Content-Disposition: form-data; name="audio"; filename="${fileName}"${CRLF}Content-Type: ${audioMimeType || "audio/wav"}${CRLF}${CRLF}`;
-    const closing = `${CRLF}--${boundary}--${CRLF}`;
-
-    const formPrefix = Buffer.from(formBody + filePart, "utf-8");
-    const formSuffix = Buffer.from(closing, "utf-8");
-    const body = Buffer.concat([formPrefix, audioBuffer, formSuffix]);
-
-    const response = await fetch("https://api.async.com/voices/clone", {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "version": "v1",
-        "Content-Type": `multipart/form-data; boundary=${boundary}`,
-        "Content-Length": body.length.toString(),
-      },
-      body,
-    });
-
-    if (!response.ok) {
-      const errBody = await response.text();
-      console.error(`Async clone error ${response.status}:`, errBody);
-      return res.status(response.status).json({ error: `Clone failed: ${errBody}` });
-    }
-
-    res.json(await response.json());
-  } catch (e: any) {
-    console.error("Voice clone error:", e.message);
-    res.status(500).json({ error: e.message || "Failed to clone voice." });
-  }
-});
-
-
-app.post("/api/voices", express.json(), async (req, res) => {
-  const { apiKey: userApiKey, ...params } = req.body;
-  const apiKey = userApiKey || process.env.ASYNC_API_KEY;
-  if (!apiKey) return res.status(400).json({ error: "Async API key not configured. Add your key in Settings." });
-  try {
-    const response = await fetch("https://api.async.com/voices", {
-      method: "POST",
-      headers: { "x-api-key": apiKey, version: "v1", "Content-Type": "application/json" },
-      body: JSON.stringify(params),
-    });
-    if (!response.ok) {
-      const errBody = await response.text();
-      console.error(`Async voices error ${response.status}:`, errBody);
-      return res.status(response.status).json({ error: `Async API error (${response.status}): ${errBody}` });
-    }
-    res.json(await response.json());
-  } catch (e: any) {
-    console.error("Voices fetch error:", e.message);
-    res.status(500).json({ error: e.message || "Failed to fetch voices" });
-  }
-});
-
-app.get("/api/voices/:id", async (req, res) => {
-  const apiKey = (req.query.api_key as string) || process.env.ASYNC_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: "Async API key not configured" });
-  try {
-    const response = await fetch(`https://api.async.com/voices/${req.params.id}`, {
-      method: "GET",
-      headers: { "x-api-key": apiKey, version: "v1" },
-    });
-    if (!response.ok) throw new Error(`Async Get Voice error: ${response.statusText}`);
-    res.json(await response.json());
-  } catch (e: any) {
-    res.status(500).json({ error: "Failed to fetch voice details" });
   }
 });
 
@@ -1332,71 +1139,8 @@ async function startServer() {
     app.get("*", (_req, res) => res.sendFile(path.resolve(distPath, "index.html")));
   }
 
-  const server = app.listen(PORT, "0.0.0.0", () => {
+  app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
-  });
-
-  // WebSocket TTS proxy — passes audio stream through to Async.com
-  const wss = new WebSocketServer({ noServer: true });
-  server.on("upgrade", (request, socket, head) => {
-    const url = new URL(request.url || "", `http://${request.headers.host}`);
-    if (url.pathname === "/api/tts/ws") {
-      wss.handleUpgrade(request, socket, head, (ws) => {
-        const userApiKey = url.searchParams.get("api_key");
-        const apiKey = userApiKey || process.env.ASYNC_API_KEY;
-        const version = url.searchParams.get("version") || "v1";
-        if (!apiKey) {
-          ws.close(1008, "API key required");
-          return;
-        }
-
-        // Async.com requires credentials as HTTP headers during the WebSocket upgrade handshake
-        const asyncWs = new WebSocket("wss://api.async.com/text_to_speech/websocket/ws", {
-          headers: { api_key: apiKey, version: version },
-        });
-
-        // Buffer messages that arrive before the upstream connection is ready
-        const pending: any[] = [];
-        let ready = false;
-
-        ws.on("message", (data) => {
-          try {
-            if (ready) asyncWs.send(data);
-            else pending.push(data);
-          } catch (e) {
-            console.error("Error forwarding to Async WS:", e);
-          }
-        });
-
-        asyncWs.on("open", () => {
-          ready = true;
-          // Flush buffered messages in order
-          for (const msg of pending) {
-            try {
-              asyncWs.send(msg);
-            } catch (e) {
-              console.error("Error flushing to Async WS:", e);
-            }
-          }
-          pending.length = 0;
-
-          asyncWs.on("message", (data) => {
-            try {
-              ws.send(data);
-            } catch (e) {
-              console.error("Error forwarding to client WS:", e);
-            }
-          });
-        });
-
-        ws.on("close", () => asyncWs.close());
-        asyncWs.on("close", () => ws.close());
-        ws.on("error", (e) => { console.error("Client WS error:", e); asyncWs.close(); });
-        asyncWs.on("error", (e) => { console.error("Async WS error:", e); ws.close(); });
-      });
-    } else {
-      socket.destroy();
-    }
   });
 }
 
