@@ -1479,7 +1479,6 @@ const AIProfileScreen: React.FC = () => {
                                                     key={v.voice_id}
                                                     onClick={() => {
                                                         setElevenLabsVoiceId(v.voice_id);
-                                                        setAsyncVoiceId(v.voice_id);
                                                         setAIProfile({ ...aiProfile, asyncVoiceId: v.voice_id, voiceProvider: 'elevenlabs' });
                                                     }}
                                                     className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${elevenLabsVoiceId === v.voice_id ? 'bg-indigo-200 dark:bg-indigo-700' : 'hover:bg-indigo-100 dark:hover:bg-indigo-800'}`}
@@ -1527,7 +1526,6 @@ const AIProfileScreen: React.FC = () => {
                                             <button
                                                 onClick={() => {
                                                     if (!elevenLabsVoiceId.trim()) return;
-                                                    setAsyncVoiceId(elevenLabsVoiceId.trim());
                                                     setAIProfile({ ...aiProfile, asyncVoiceId: elevenLabsVoiceId.trim(), voiceProvider: 'elevenlabs' });
                                                     addToast({ title: 'Voice Set', message: 'Custom ElevenLabs voice ID saved.', type: 'success' });
                                                 }}
