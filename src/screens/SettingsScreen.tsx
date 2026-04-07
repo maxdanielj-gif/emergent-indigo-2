@@ -14,8 +14,12 @@ const SettingsScreen: React.FC = () => {
     anthropicApiKey, setAnthropicApiKey,
     elevenLabsApiKey, setElevenLabsApiKey,
     geminiApiKey, setGeminiApiKey,
+    freepikApiKey, setFreepikApiKey,
     wavespeedApiKey, setWavespeedApiKey,
+    stabilityApiKey, setStabilityApiKey,
+    openRouterApiKey, setOpenRouterApiKey,
     cartesiaApiKey, setCartesiaApiKey,
+    emergentLlmKey, setEmergentLlmKey,
     mongoUri, setMongoUri,
     setShowTutorial,
     autoSaveChat, setAutoSaveChat, autoSaveChatInterval, setAutoSaveChatInterval,
@@ -54,8 +58,12 @@ const SettingsScreen: React.FC = () => {
   const [localAnthropicApiKey,    setLocalAnthropicApiKey]    = useState(anthropicApiKey || '');
   const [localElevenLabsApiKey,   setLocalElevenLabsApiKey]   = useState(elevenLabsApiKey || '');
   const [localGeminiApiKey,       setLocalGeminiApiKey]       = useState(geminiApiKey || '');
+  const [localFreepikApiKey,    setLocalFreepikApiKey]    = useState(freepikApiKey    || '');
   const [localWavespeedApiKey,  setLocalWavespeedApiKey]  = useState(wavespeedApiKey  || '');
+  const [localStabilityApiKey,  setLocalStabilityApiKey]  = useState(stabilityApiKey  || '');
+  const [localOpenRouterApiKey, setLocalOpenRouterApiKey] = useState(openRouterApiKey || '');
   const [localCartesiaApiKey,   setLocalCartesiaApiKey]   = useState(cartesiaApiKey   || '');
+  const [localEmergentLlmKey,   setLocalEmergentLlmKey]   = useState(emergentLlmKey   || '');
   const [localMongoUri,         setLocalMongoUri]         = useState(mongoUri         || '');
   const [isApplyingMongo,       setIsApplyingMongo]       = useState(false);
   const [isFirebaseBackingUp,  setIsFirebaseBackingUp]  = useState(false);
@@ -93,8 +101,12 @@ const SettingsScreen: React.FC = () => {
   React.useEffect(() => { setLocalAsyncApiKey(asyncApiKey || ''); }, [asyncApiKey]);
   React.useEffect(() => { setLocalElevenLabsApiKey(elevenLabsApiKey || ''); }, [elevenLabsApiKey]);
   React.useEffect(() => { setLocalGeminiApiKey(geminiApiKey || ''); }, [geminiApiKey]);
+  React.useEffect(() => { setLocalFreepikApiKey(freepikApiKey || ''); }, [freepikApiKey]);
   React.useEffect(() => { setLocalWavespeedApiKey(wavespeedApiKey || ''); }, [wavespeedApiKey]);
+  React.useEffect(() => { setLocalStabilityApiKey(stabilityApiKey || ''); }, [stabilityApiKey]);
+  React.useEffect(() => { setLocalOpenRouterApiKey(openRouterApiKey || ''); }, [openRouterApiKey]);
   React.useEffect(() => { setLocalCartesiaApiKey(cartesiaApiKey || ''); }, [cartesiaApiKey]);
+  React.useEffect(() => { setLocalEmergentLlmKey(emergentLlmKey || ''); }, [emergentLlmKey]);
   React.useEffect(() => { setLocalMongoUri(mongoUri || ''); }, [mongoUri]);
   const [localSyncId,          setLocalSyncId]          = useState(userId || '');
   const [recoveryId,           setRecoveryId]           = useState('');
@@ -178,13 +190,29 @@ const SettingsScreen: React.FC = () => {
     addToast({ title: 'Saved', message: 'Gemini API key saved.', type: 'success' });
   };
 
+  const handleSaveFreepikKey = () => {
+    setFreepikApiKey(localFreepikApiKey.trim() || null);
+    addToast({ title: 'Saved', message: 'Freepik API key saved.', type: 'success' });
+  };
   const handleSaveWavespeedKey = () => {
     setWavespeedApiKey(localWavespeedApiKey.trim() || null);
     addToast({ title: 'Saved', message: 'WaveSpeed API key saved.', type: 'success' });
   };
+  const handleSaveStabilityKey = () => {
+    setStabilityApiKey(localStabilityApiKey.trim() || null);
+    addToast({ title: 'Saved', message: 'Stability AI key saved.', type: 'success' });
+  };
+  const handleSaveOpenRouterKey = () => {
+    setOpenRouterApiKey(localOpenRouterApiKey.trim() || null);
+    addToast({ title: 'Saved', message: 'OpenRouter key saved.', type: 'success' });
+  };
   const handleSaveCartesiaKey = () => {
     setCartesiaApiKey(localCartesiaApiKey.trim() || null);
     addToast({ title: 'Saved', message: 'Cartesia key saved.', type: 'success' });
+  };
+  const handleSaveEmergentLlmKey = () => {
+    setEmergentLlmKey(localEmergentLlmKey.trim() || null);
+    addToast({ title: 'Saved', message: 'Emergent LLM key saved.', type: 'success' });
   };
 
   const handleSaveFirebaseConfig = () => {
@@ -689,6 +717,29 @@ const SettingsScreen: React.FC = () => {
               </p>
             </div>
 
+            {/* Freepik */}
+            <div>
+              <label className="block text-sm font-medium text-indigo-700 dark:text-indigo-300 mb-1">
+                Freepik API Key <span className="text-indigo-400 dark:text-indigo-500 font-normal">(required for image generation)</span>
+              </label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-400" />
+                  <input
+                    type="password"
+                    value={localFreepikApiKey}
+                    onChange={(e) => setLocalFreepikApiKey(e.target.value)}
+                    placeholder="Your Freepik API key"
+                    className="app-input pl-9"
+                  />
+                </div>
+                <button onClick={handleSaveFreepikKey} className="app-btn-primary">Save</button>
+              </div>
+              <p className="text-xs text-indigo-500 dark:text-indigo-400 mt-1">
+                Get a key at <a href="https://www.freepik.com/developers/dashboard" target="_blank" rel="noreferrer" className="underline">freepik.com/developers</a>. Enables AI image generation. New accounts get $5 in free credits.
+              </p>
+            </div>
+
             {/* WaveSpeed */}
             <div>
               <label className="block text-sm font-medium text-indigo-700 dark:text-indigo-300 mb-1">
@@ -712,6 +763,27 @@ const SettingsScreen: React.FC = () => {
               </p>
             </div>
 
+            {/* OpenRouter */}
+            <div>
+              <label className="block text-sm font-medium text-indigo-700 dark:text-indigo-300 mb-1">
+                OpenRouter API Key <span className="text-indigo-400 dark:text-indigo-500 font-normal">(for 200+ LLM models)</span>
+              </label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-400" />
+                  <input type="password" value={localOpenRouterApiKey}
+                    onChange={(e) => setLocalOpenRouterApiKey(e.target.value)}
+                    placeholder="sk-or-..."
+                    data-testid="openrouter-api-key-input"
+                    className="app-input pl-9" />
+                </div>
+                <button onClick={handleSaveOpenRouterKey} data-testid="openrouter-api-key-save" className="app-btn-primary">Save</button>
+              </div>
+              <p className="text-xs text-indigo-500 dark:text-indigo-400 mt-1">
+                Get a key at <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" className="underline">openrouter.ai/keys</a>. Routes to Claude, GPT, Llama, Mistral, DeepSeek and more.
+              </p>
+            </div>
+
             {/* Cartesia */}
             <div>
               <label className="block text-sm font-medium text-indigo-700 dark:text-indigo-300 mb-1">
@@ -730,6 +802,49 @@ const SettingsScreen: React.FC = () => {
               </div>
               <p className="text-xs text-indigo-500 dark:text-indigo-400 mt-1">
                 Get a key at <a href="https://play.cartesia.ai/keys" target="_blank" rel="noreferrer" className="underline">play.cartesia.ai/keys</a>. Fast, realistic neural TTS.
+              </p>
+            </div>
+
+            {/* Emergent LLM Key */}
+            <div>
+              <label className="block text-sm font-medium text-indigo-700 dark:text-indigo-300 mb-1">
+                Emergent LLM Key <span className="text-indigo-400 dark:text-indigo-500 font-normal">(universal key override)</span>
+              </label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-400" />
+                  <input type="password" value={localEmergentLlmKey}
+                    onChange={(e) => setLocalEmergentLlmKey(e.target.value)}
+                    placeholder="Override the built-in Emergent key"
+                    data-testid="emergent-llm-key-input"
+                    className="app-input pl-9" />
+                </div>
+                <button onClick={handleSaveEmergentLlmKey} data-testid="emergent-llm-key-save" className="app-btn-primary">Save</button>
+              </div>
+              <p className="text-xs text-indigo-500 dark:text-indigo-400 mt-1">
+                Overrides the built-in Emergent universal key for OpenAI, Claude, and Gemini calls. Leave blank to use the platform default.
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-indigo-700 dark:text-indigo-300 mb-1">
+                Stability AI Key <span className="text-indigo-400 dark:text-indigo-500 font-normal">(for SD3.5 — minimal content restrictions)</span>
+              </label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-400" />
+                  <input
+                    type="password"
+                    value={localStabilityApiKey}
+                    onChange={(e) => setLocalStabilityApiKey(e.target.value)}
+                    placeholder="sk-..."
+                    data-testid="stability-api-key-input"
+                    className="app-input pl-9"
+                  />
+                </div>
+                <button onClick={handleSaveStabilityKey} data-testid="stability-api-key-save" className="app-btn-primary">Save</button>
+              </div>
+              <p className="text-xs text-indigo-500 dark:text-indigo-400 mt-1">
+                Get a key at <a href="https://platform.stability.ai/account/keys" target="_blank" rel="noreferrer" className="underline">platform.stability.ai</a>. Enables Stable Image Core and SD3.5 generation.
               </p>
             </div>
 

@@ -31,7 +31,7 @@ const AIProfileScreen: React.FC = () => {
     aiProfile, setAIProfile, savePersona, deletePersona, savedPersonas, loadPersona, 
     asyncApiKey, setAmbientMode, setAmbientFrequency, addToast,
     anthropicApiKey, elevenLabsApiKey, geminiApiKey, userId,
-    cartesiaApiKey,
+    cartesiaApiKey, openRouterApiKey,
   } = useApp();
   const { chatHistory, sessions, activeSessionId, setChatHistory, setSessions, setActiveSessionId } = useChat();
   const [name, setName] = useState(aiProfile.name);
@@ -93,6 +93,19 @@ const AIProfileScreen: React.FC = () => {
   }, [userId]);
   
   const CLAUDE_MODELS = ['claude-sonnet-4-6', 'claude-opus-4-6', 'claude-haiku-4-5-20251001'];
+  const OPENROUTER_MODELS = [
+    { id: 'openai/gpt-4o',                             name: 'GPT-4o (OpenAI)'              },
+    { id: 'openai/gpt-4.1',                            name: 'GPT-4.1 (OpenAI)'             },
+    { id: 'anthropic/claude-sonnet-4-5',               name: 'Claude Sonnet 4.5 (Anthropic)' },
+    { id: 'meta-llama/llama-3.3-70b-instruct',         name: 'Llama 3.3 70B (Meta)'         },
+    { id: 'google/gemini-2.0-flash-001',               name: 'Gemini 2.0 Flash (Google)'    },
+    { id: 'mistralai/mistral-nemo',                    name: 'Mistral Nemo (Mistral)'        },
+    { id: 'deepseek/deepseek-chat',                    name: 'DeepSeek V3 (DeepSeek)'       },
+    { id: 'qwen/qwen-2.5-72b-instruct',               name: 'Qwen 2.5 72B (Alibaba)'       },
+    { id: 'microsoft/phi-4',                           name: 'Phi-4 (Microsoft)'             },
+    { id: 'nousresearch/hermes-3-llama-3.1-405b',     name: 'Hermes 3 405B (Nous)'         },
+  ];
+
   const CARTESIA_VOICES = [
     { id: 'a0e99841-438c-4a64-b679-ae501e7d6091', name: 'Barbershop Man',       lang: 'English', gender: 'Male'   },
     { id: '156fb8d2-335b-4950-9cb3-a2d33befec77', name: 'Helpful Woman',        lang: 'English', gender: 'Female' },
@@ -105,7 +118,7 @@ const AIProfileScreen: React.FC = () => {
     { id: '29e5f8b4-b953-4160-848f-40fae182235b', name: 'Korean Calm Woman',   lang: 'Korean',  gender: 'Female' },
   ];
 
-  // Accept any model string
+  // Accept any model string (Claude, Gemini, or OpenRouter slash-format)
   const validateModel = (m: string | undefined): string => {
     if (m) return m;
     return 'claude-sonnet-4-6';
@@ -524,6 +537,7 @@ const AIProfileScreen: React.FC = () => {
             userProfile: { name: 'User', email: '', info: '', preferences: '', appearance: '', referenceImage: null },
             anthropicKey: anthropicApiKey || undefined,
             geminiKey: geminiApiKey || undefined,
+            openRouterKey: openRouterApiKey || undefined,
           }),
         });
         if (!res.ok) throw new Error((await res.json()).error || 'Failed');
@@ -728,6 +742,10 @@ const AIProfileScreen: React.FC = () => {
   const [elStyle,          setElStyle]          = useState<number>(aiProfile.elStyle           ?? 0);
   const [elSpeakerBoost,   setElSpeakerBoost]   = useState<boolean>(aiProfile.elSpeakerBoost  ?? true);
   const [elSpeakingRate,   setElSpeakingRate]   = useState<number>(aiProfile.elSpeakingRate   ?? 1.0);
+
+  const [openRouterCustomModel, setOpenRouterCustomModel] = useState<string>(
+    model && model.includes('/') ? model : ''
+  );
 
   // LLM max tokens
   const [maxTokens, setMaxTokens] = useState<number>(aiProfile.maxTokens ?? 2048);
@@ -1365,6 +1383,7 @@ const AIProfileScreen: React.FC = () => {
                                 value={model}
                                 onChange={(e) => {
                                   setModel(e.target.value);
+                                  if (!e.target.value.includes('/')) setOpenRouterCustomModel('');
                                 }}
                                 className="w-full p-2 border border-indigo-300 dark:border-indigo-700 rounded-md bg-white dark:bg-indigo-900 text-indigo-900 dark:text-indigo-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                             >
@@ -1375,7 +1394,27 @@ const AIProfileScreen: React.FC = () => {
                                 <option value="gemini-2.0-flash">Gemini 2.0 Flash (Fast)</option>
                                 <option value="gemini-1.5-pro">Gemini 1.5 Pro (Capable)</option>
                                 <option value="gemini-1.5-flash">Gemini 1.5 Flash (Fastest)</option>
+                                <option disabled value="">── OpenRouter (requires OpenRouter key) ──</option>
+                                {OPENROUTER_MODELS.map(m => (
+                                  <option key={m.id} value={m.id}>{m.name}</option>
+                                ))}
+                                <option value="__custom_openrouter__">Custom OpenRouter model…</option>
                             </select>
+                            {(model === '__custom_openrouter__' || (model.includes('/') && !OPENROUTER_MODELS.find(m => m.id === model))) && (
+                              <div className="mt-2">
+                                <input
+                                  type="text"
+                                  value={openRouterCustomModel}
+                                  onChange={(e) => {
+                                    setOpenRouterCustomModel(e.target.value);
+                                    if (e.target.value.trim()) setModel(e.target.value.trim());
+                                  }}
+                                  placeholder="e.g. nousresearch/hermes-3-llama-3.1-405b"
+                                  className="w-full p-2 border border-indigo-300 dark:border-indigo-700 rounded-md bg-white dark:bg-indigo-900 text-indigo-900 dark:text-indigo-100 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                />
+                                <p className="text-[10px] text-indigo-400 dark:text-indigo-500 mt-0.5">Enter any <a href="https://openrouter.ai/models" target="_blank" rel="noreferrer" className="underline">OpenRouter model ID</a></p>
+                              </div>
+                            )}
                         </div>
                         
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
