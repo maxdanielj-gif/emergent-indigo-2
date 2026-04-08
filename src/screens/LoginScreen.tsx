@@ -1,25 +1,47 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 
+const SKIP_AUTH_KEY = 'indigo_skip_auth';
+
 const LoginScreen: React.FC = () => {
-  const { signInWithGoogle } = useApp();
+  const { signInWithGoogle, firebaseProjectId } = useApp();
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const projectId = firebaseProjectId || import.meta.env.VITE_FIREBASE_PROJECT_ID || null;
+  const hostname  = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
 
   const handleSignIn = async () => {
     setIsLoading(true);
-    setError(null);
+    setErrorCode(null);
+    setErrorMsg(null);
     try {
       await signInWithGoogle();
     } catch (e: any) {
-      const msg = e?.code === 'auth/popup-closed-by-user'
-        ? 'Sign-in cancelled.'
-        : e?.message || 'Sign-in failed. Please try again.';
-      setError(msg);
+      const code = e?.code as string | undefined;
+      setErrorCode(code || null);
+      if (code === 'auth/popup-closed-by-user') {
+        setErrorMsg('Sign-in cancelled.');
+      } else {
+        setErrorMsg(e?.message || 'Sign-in failed. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
   };
+
+  const handleSkip = () => {
+    localStorage.setItem(SKIP_AUTH_KEY, 'true');
+    // Force a page reload so the AuthGate re-evaluates the skip flag
+    window.location.reload();
+  };
+
+  const isUnauthorizedDomain = errorCode === 'auth/unauthorized-domain';
+
+  const consoleLink = projectId
+    ? `https://console.firebase.google.com/project/${projectId}/authentication/settings`
+    : 'https://console.firebase.google.com';
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
@@ -40,9 +62,39 @@ const LoginScreen: React.FC = () => {
           <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-1">Welcome back</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Sign in to access your data and cloud sync.</p>
 
-          {error && (
+          {/* Generic error */}
+          {errorMsg && !isUnauthorizedDomain && (
             <div className="mb-4 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm text-red-700 dark:text-red-400">
-              {error}
+              {errorMsg}
+            </div>
+          )}
+
+          {/* Unauthorized domain — detailed fix instructions */}
+          {isUnauthorizedDomain && (
+            <div className="mb-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3 text-sm text-amber-800 dark:text-amber-300 space-y-2">
+              <p className="font-semibold">Domain not authorized in Firebase</p>
+              <p>Add this domain to your Firebase project's authorized list:</p>
+              <div className="font-mono bg-amber-100 dark:bg-amber-900/40 rounded px-2 py-1 text-xs break-all">
+                {hostname}
+              </div>
+              {projectId && (
+                <p className="text-xs">
+                  Firebase Project ID: <span className="font-mono">{projectId}</span>
+                </p>
+              )}
+              <ol className="list-decimal list-inside space-y-1 text-xs">
+                <li>Open the <a href={consoleLink} target="_blank" rel="noreferrer" className="underline font-medium">Firebase Console{projectId ? ` → ${projectId}` : ''}</a></li>
+                <li>Go to <strong>Authentication → Settings → Authorized domains</strong></li>
+                <li>Click <strong>Add domain</strong> and enter <span className="font-mono">{hostname}</span></li>
+                <li>Return here and try signing in again</li>
+              </ol>
+              <p className="text-xs text-amber-600 dark:text-amber-400 pt-1">
+                Can't access Firebase Console right now?{' '}
+                <button onClick={handleSkip} className="underline font-medium">
+                  Continue without signing in
+                </button>{' '}
+                to reach Settings and check your Firebase config.
+              </p>
             </div>
           )}
 
@@ -67,6 +119,14 @@ const LoginScreen: React.FC = () => {
             )}
             {isLoading ? 'Signing in…' : 'Sign in with Google'}
           </button>
+
+          {!isUnauthorizedDomain && (
+            <p className="mt-4 text-center text-xs text-gray-400 dark:text-gray-500">
+              <button onClick={handleSkip} className="underline hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+                Continue without signing in
+              </button>
+            </p>
+          )}
         </div>
 
         <p className="mt-6 text-center text-xs text-gray-400 dark:text-gray-500">
@@ -77,4 +137,5 @@ const LoginScreen: React.FC = () => {
   );
 };
 
+export { SKIP_AUTH_KEY };
 export default LoginScreen;
