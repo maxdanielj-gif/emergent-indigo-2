@@ -1767,6 +1767,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setAuthLoading(false);
       return;
     }
+    // Safety timeout — never leave the app stuck on auth loading
+    const timeout = setTimeout(() => setAuthLoading(false), 5000);
     let unsubscribe: (() => void) | undefined;
     try {
       const runtimeConfig = {
@@ -1775,6 +1777,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         appId: firebaseAppId, messagingSenderId: firebaseMessagingSenderId,
       };
       unsubscribe = onAuthStateChange((user) => {
+        clearTimeout(timeout);
         setCurrentUser(user);
         if (user) {
           setUserId(user.uid);
@@ -1784,9 +1787,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }, runtimeConfig);
     } catch (e) {
       console.error('Firebase auth init failed:', e);
+      clearTimeout(timeout);
       setAuthLoading(false);
     }
-    return () => { if (unsubscribe) unsubscribe(); };
+    return () => { clearTimeout(timeout); if (unsubscribe) unsubscribe(); };
   // Only re-subscribe when the core config values actually change
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firebaseApiKey, firebaseProjectId, firebaseAppId, firebaseAuthDomain]);

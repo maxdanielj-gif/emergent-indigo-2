@@ -17,11 +17,11 @@ import LoginScreen, { SKIP_AUTH_KEY } from './screens/LoginScreen';
 import ErrorBoundary from './components/ErrorBoundary';
 import MobileDebugger from './components/MobileDebugger';
 
-const AppContent: React.FC = () => {
+const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUser, authLoading, signInWithGoogle } = useApp();
-  const [skipped]   = useState(() => localStorage.getItem(SKIP_AUTH_KEY) === 'true');
+  const [skipped]          = useState(() => localStorage.getItem(SKIP_AUTH_KEY) === 'true');
   const [bannerDismissed, setBannerDismissed] = useState(false);
-  const [signingIn, setSigningIn] = useState(false);
+  const [signingIn,        setSigningIn]       = useState(false);
 
   if (authLoading) {
     return (
@@ -45,14 +45,14 @@ const AppContent: React.FC = () => {
       await signInWithGoogle();
       localStorage.removeItem(SKIP_AUTH_KEY);
     } catch {
-      // stay on banner
+      // stay on banner; user can retry
     } finally {
       setSigningIn(false);
     }
   };
 
   return (
-    <Router>
+    <>
       {/* "Skipped auth" banner — shown until signed in or dismissed */}
       {!currentUser && skipped && !bannerDismissed && (
         <div className="fixed top-0 inset-x-0 z-50 flex items-center justify-between gap-3 bg-amber-500 text-white text-xs px-4 py-2">
@@ -69,23 +69,8 @@ const AppContent: React.FC = () => {
           </div>
         </div>
       )}
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Navigate to="/chat" replace />} />
-          <Route path="/chat" element={<ChatScreen />} />
-          <Route path="/history" element={<HistoryScreen />} />
-          <Route path="/ai-profile" element={<AIProfileScreen />} />
-          <Route path="/user-profile" element={<UserProfileScreen />} />
-          <Route path="/memory" element={<MemoryScreen />} />
-          <Route path="/gallery" element={<GalleryScreen />} />
-          <Route path="/image-generator" element={<ImageGeneratorScreen />} />
-          <Route path="/journal" element={<JournalScreen />} />
-          <Route path="/settings" element={<SettingsScreen />} />
-          <Route path="*" element={<Navigate to="/chat" replace />} />
-        </Routes>
-      </Layout>
-      <MobileDebugger />
-    </Router>
+      {children}
+    </>
   );
 };
 
@@ -94,7 +79,26 @@ const App: React.FC = () => {
     <ErrorBoundary>
       <AppProvider>
         <ChatProvider>
-          <AppContent />
+          <AuthGate>
+            <Router>
+              <Layout>
+                <Routes>
+                  <Route path="/" element={<Navigate to="/chat" replace />} />
+                  <Route path="/chat" element={<ChatScreen />} />
+                  <Route path="/history" element={<HistoryScreen />} />
+                  <Route path="/ai-profile" element={<AIProfileScreen />} />
+                  <Route path="/user-profile" element={<UserProfileScreen />} />
+                  <Route path="/memory" element={<MemoryScreen />} />
+                  <Route path="/gallery" element={<GalleryScreen />} />
+                  <Route path="/image-generator" element={<ImageGeneratorScreen />} />
+                  <Route path="/journal" element={<JournalScreen />} />
+                  <Route path="/settings" element={<SettingsScreen />} />
+                  <Route path="*" element={<Navigate to="/chat" replace />} />
+                </Routes>
+              </Layout>
+              <MobileDebugger />
+            </Router>
+          </AuthGate>
         </ChatProvider>
       </AppProvider>
     </ErrorBoundary>
