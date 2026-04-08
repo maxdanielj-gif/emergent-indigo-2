@@ -3,6 +3,12 @@ import {
   getFirestore, doc, setDoc, getDoc, Firestore, serverTimestamp,
 } from 'firebase/firestore';
 import { getStorage, ref as storageRef, uploadString, getDownloadURL, FirebaseStorage } from 'firebase/storage';
+import {
+  getAuth, GoogleAuthProvider, signInWithPopup, signOut as fbSignOut,
+  onAuthStateChanged, User as FirebaseUser, Auth,
+} from 'firebase/auth';
+
+export type { FirebaseUser };
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export interface KnowledgeBaseFile {
@@ -36,9 +42,10 @@ function isConfigured(config: ReturnType<typeof buildConfig>): boolean {
 }
 
 // ── Global Firebase instances ─────────────────────────────────────────────────
-let currentApp:  FirebaseApp      | null = null;
-let currentDb:   Firestore        | null = null;
-let currentStorage: FirebaseStorage | null = null;
+let currentApp:     FirebaseApp      | null = null;
+let currentDb:      Firestore        | null = null;
+let currentStorage: FirebaseStorage  | null = null;
+let currentAuth:    Auth             | null = null;
 let lastConfigKey = '';
 
 function getApp(runtime?: FirebaseRuntimeConfig): FirebaseApp {
@@ -56,6 +63,7 @@ function getApp(runtime?: FirebaseRuntimeConfig): FirebaseApp {
     currentApp     = initializeApp(config, `indigo-${Date.now()}`);
     currentDb      = getFirestore(currentApp);
     currentStorage = null; // reset on config change
+    currentAuth    = null; // reset on config change
     lastConfigKey  = configKey;
   }
 
@@ -66,6 +74,33 @@ function getDb(runtime?: FirebaseRuntimeConfig): Firestore {
   const app = getApp(runtime);
   if (!currentDb) currentDb = getFirestore(app);
   return currentDb!;
+}
+
+// ── Auth helpers ─────────────────────────────────────────────────────────────
+function getAuthInstance(runtime?: FirebaseRuntimeConfig): Auth {
+  const app = getApp(runtime);
+  if (!currentAuth) currentAuth = getAuth(app);
+  return currentAuth;
+}
+
+export async function signInWithGoogle(runtime?: FirebaseRuntimeConfig): Promise<FirebaseUser> {
+  const auth     = getAuthInstance(runtime);
+  const provider = new GoogleAuthProvider();
+  const result   = await signInWithPopup(auth, provider);
+  return result.user;
+}
+
+export async function signOutUser(runtime?: FirebaseRuntimeConfig): Promise<void> {
+  const auth = getAuthInstance(runtime);
+  await fbSignOut(auth);
+}
+
+export function onAuthStateChange(
+  callback: (user: FirebaseUser | null) => void,
+  runtime?: FirebaseRuntimeConfig,
+): () => void {
+  const auth = getAuthInstance(runtime);
+  return onAuthStateChanged(auth, callback);
 }
 
 // ── Backup app data to Firestore ──────────────────────────────────────────────
@@ -183,7 +218,7 @@ export async function restoreGalleryFromFirebaseStorage(
     }
 
     // Fetch the image and convert to a local data URL
-    const response = await fetch(downloadUrl);
+    const response = await fetch(downloadUrl!);
     if (!response.ok) throw new Error(`Failed to download image ${i + 1}: HTTP ${response.status}`);
     const blob    = await response.blob();
     const dataUrl = await new Promise<string>((resolve, reject) => {

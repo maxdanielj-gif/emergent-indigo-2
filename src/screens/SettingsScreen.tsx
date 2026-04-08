@@ -5,7 +5,7 @@ import { useChat } from '../context/ChatContext';
 import { requestNotificationPermission } from '../services/webPushService';
 import { showNativeNotification } from '../services/notificationService';
 import { processFile } from '../services/ocrService';
-import { Download, Upload, Trash2, Bell, FileText, Key, HelpCircle, Save, Database, MapPin, Copy, Smartphone, Cloud, RefreshCw, Clock, Shield, Edit2 } from 'lucide-react';
+import { Download, Upload, Trash2, Bell, FileText, Key, HelpCircle, Save, Database, MapPin, Copy, Smartphone, Cloud, RefreshCw, Clock, Shield, Edit2, LogOut, User } from 'lucide-react';
 
 const SettingsScreen: React.FC = () => {
   const {
@@ -35,6 +35,7 @@ const SettingsScreen: React.FC = () => {
     firebaseStorageBucket, firebaseMessagingSenderId, firebaseAppId,
     firebaseVapidKey, firebaseServiceAccountKey,
     setFirebaseConfig, setFirebaseServiceAccountKey,
+    currentUser, signOut,
     lastCloudSyncTime, setLastCloudSyncTime,
     lastFirebaseBackupTime, setLastFirebaseBackupTime,
     lastGalleryBackupTime, setLastGalleryBackupTime,
@@ -698,29 +699,31 @@ const SettingsScreen: React.FC = () => {
               </div>
             )}
 
-            {/* Sync ID */}
-            <div>
-              <label className="block text-xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider mb-1">Your Sync ID</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={localSyncId}
-                  onChange={(e) => setLocalSyncId(e.target.value)}
-                  placeholder="Custom Sync ID"
-                  className="app-input flex-1 font-mono text-sm"
-                />
-                <button onClick={handleSaveSyncId} title="Save ID" className="app-btn-primary px-3">
-                  <Save className="w-4 h-4" />
-                </button>
+            {/* Google Account */}
+            {currentUser && (
+              <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 flex items-center gap-3">
+                {currentUser.photoURL ? (
+                  <img src={currentUser.photoURL} alt="avatar" className="w-10 h-10 rounded-full flex-shrink-0" referrerPolicy="no-referrer" />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-indigo-300 dark:bg-indigo-700 flex items-center justify-center flex-shrink-0">
+                    <User className="w-5 h-5 text-indigo-700 dark:text-indigo-200" />
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-indigo-900 dark:text-indigo-100 truncate">{currentUser.displayName || 'Google User'}</p>
+                  <p className="text-xs text-indigo-500 dark:text-indigo-400 truncate">{currentUser.email}</p>
+                  <p className="text-xs text-indigo-400 dark:text-indigo-500 font-mono truncate mt-0.5">UID: {currentUser.uid}</p>
+                </div>
                 <button
-                  onClick={() => { navigator.clipboard.writeText(localSyncId); addToast({ title: 'Copied', message: 'Sync ID copied.', type: 'success' }); }}
-                  title="Copy ID" className="app-btn-ghost px-3"
+                  onClick={async () => { await signOut(); addToast({ title: 'Signed out', message: 'You have been signed out.', type: 'info' }); }}
+                  title="Sign out"
+                  className="app-btn-ghost flex-shrink-0 flex items-center gap-1 text-sm px-2"
                 >
-                  <Copy className="w-4 h-4" />
+                  <LogOut className="w-4 h-4" />
+                  <span className="hidden sm:inline">Sign out</span>
                 </button>
               </div>
-              <p className="text-xs text-indigo-500 dark:text-indigo-400 mt-1 italic">Save this ID — you'll need it to recover on another device.</p>
-            </div>
+            )}
 
             <div>
               <button
@@ -902,13 +905,8 @@ const SettingsScreen: React.FC = () => {
             {/* Backup / Restore */}
             <div className="pt-2 border-t border-indigo-100 dark:border-indigo-800 space-y-3">
               <p className="text-sm text-indigo-600 dark:text-indigo-400">
-                Back up your <strong>full app data</strong> (personas, chat, memories, journal, settings) to Firestore. Use the same User ID on any device to restore.
+                Back up your <strong>full app data</strong> (personas, chat, memories, journal, settings) to Firestore. Your Google account UID is used to identify your backup.
               </p>
-              {!userId && (
-                <div className="p-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-xl text-sm text-amber-700 dark:text-amber-300">
-                  Set a User ID in Cloud Sync &amp; Recovery above before backing up.
-                </div>
-              )}
 
               {/* App data backup / check */}
               <div>

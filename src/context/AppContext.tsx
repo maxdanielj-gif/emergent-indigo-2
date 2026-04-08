@@ -3,7 +3,7 @@ import { gzipSync, strToU8, gunzipSync, strFromU8 } from 'fflate';
 import { saveToDB, loadFromDB, deleteFromDB, clearDB } from '../services/db';
 import { onForegroundMessage, requestNotificationPermission } from '../services/webPushService';
 import { showNativeNotification } from '../services/notificationService';
-import { backupToFirestore, restoreFromFirestore, uploadGalleryToFirebaseStorage, restoreGalleryFromFirebaseStorage, uploadKnowledgeBaseToFirebaseStorage, restoreKnowledgeBaseFromFirebaseStorage } from '../services/firebaseService';
+import { backupToFirestore, restoreFromFirestore, uploadGalleryToFirebaseStorage, restoreGalleryFromFirebaseStorage, uploadKnowledgeBaseToFirebaseStorage, restoreKnowledgeBaseFromFirebaseStorage, signInWithGoogle as fbSignInWithGoogle, signOutUser as fbSignOutUser, onAuthStateChange, FirebaseUser } from '../services/firebaseService';
 import { AIProfile, UserProfile, ChatMessage, GalleryItem, JournalEntry, Memory, KnowledgeBaseDocument, ChatSession, Background, ProactiveCommunication } from '../types';
 
 export interface Toast {
@@ -46,7 +46,9 @@ interface AppState {
   timeZone: string;
   backgrounds: Background[];
   firebaseApiKey: string | null;
+  firebaseAuthDomain: string | null;
   firebaseProjectId: string | null;
+  firebaseStorageBucket: string | null;
   firebaseAppId: string | null;
   firebaseMessagingSenderId: string | null;
   firebaseVapidKey: string | null;
@@ -174,6 +176,10 @@ interface AppContextType extends AppState {
   setIsSyncing: (syncing: boolean) => void;
   galleryLoaded: boolean;
   loadGallery: () => Promise<void>;
+  currentUser: FirebaseUser | null;
+  authLoading: boolean;
+  signInWithGoogle: () => Promise<void>;
+  signOut: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -329,6 +335,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [firebaseServiceAccountKey,setFirebaseServiceAccountKey]= useState<string | null>(null);
   const [googleClientId, setGoogleClientId] = useState<string | null>(null);
   const [googleClientSecret, setGoogleClientSecret] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [lastInteractionTime, setLastInteractionTime] = useState(Date.now());
   const [userId, setUserId] = useState<string>(() => {
     const storedId = localStorage.getItem('indigo_user_id') || '';
@@ -1752,6 +1760,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
   const setGoogleConfig   = (_clientId: string, _clientSecret: string) => {};
 
+  // ── Firebase Auth state listener ─────────────────────────────────────────────
+  useEffect(() => {
+    const hasConfig = firebaseApiKey || import.meta.env.VITE_FIREBASE_API_KEY;
+    if (!hasConfig) {
+      setAuthLoading(false);
+      return;
+    }
+    let unsubscribe: (() => void) | undefined;
+    try {
+      const runtimeConfig = {
+        apiKey: firebaseApiKey, authDomain: firebaseAuthDomain,
+        projectId: firebaseProjectId, storageBucket: firebaseStorageBucket,
+        appId: firebaseAppId, messagingSenderId: firebaseMessagingSenderId,
+      };
+      unsubscribe = onAuthStateChange((user) => {
+        setCurrentUser(user);
+        if (user) {
+          setUserId(user.uid);
+          localStorage.setItem('indigo_user_id', user.uid);
+        }
+        setAuthLoading(false);
+      }, runtimeConfig);
+    } catch (e) {
+      console.error('Firebase auth init failed:', e);
+      setAuthLoading(false);
+    }
+    return () => { if (unsubscribe) unsubscribe(); };
+  // Only re-subscribe when the core config values actually change
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firebaseApiKey, firebaseProjectId, firebaseAppId, firebaseAuthDomain]);
+
+  const signInWithGoogle = async () => {
+    const runtimeConfig = {
+      apiKey: firebaseApiKey, authDomain: firebaseAuthDomain,
+      projectId: firebaseProjectId, storageBucket: firebaseStorageBucket,
+      appId: firebaseAppId, messagingSenderId: firebaseMessagingSenderId,
+    };
+    await fbSignInWithGoogle(runtimeConfig);
+  };
+
+  const signOut = async () => {
+    const runtimeConfig = {
+      apiKey: firebaseApiKey, authDomain: firebaseAuthDomain,
+      projectId: firebaseProjectId, storageBucket: firebaseStorageBucket,
+      appId: firebaseAppId, messagingSenderId: firebaseMessagingSenderId,
+    };
+    await fbSignOutUser(runtimeConfig);
+    setCurrentUser(null);
+  };
+
   const setAutoSaveChat = (enabled: boolean) => setAutoSaveChatState(enabled);
   const updateUserId = (id: string) => {
     setUserId(id);
@@ -1869,6 +1927,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       firebaseBackup, firebaseRestore, firebaseGalleryBackup, firebaseGalleryRestore,
       autoBackupSchedule, setAutoBackupSchedule,
       realTimeSyncEnabled, setRealTimeSyncEnabled,
+      currentUser, authLoading, signInWithGoogle, signOut,
     }}>
       {!isLoaded ? (
         <div className="flex h-screen flex-col items-center justify-center bg-indigo-50 dark:bg-indigo-950 p-4 text-center">
