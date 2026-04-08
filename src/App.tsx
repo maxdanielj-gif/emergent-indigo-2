@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider } from './context/AppContext';
 import { ChatProvider } from './context/ChatContext';
@@ -13,12 +13,15 @@ import GalleryScreen from './screens/GalleryScreen';
 import ImageGeneratorScreen from './screens/ImageGeneratorScreen';
 import JournalScreen from './screens/JournalScreen';
 import SettingsScreen from './screens/SettingsScreen';
-import LoginScreen from './screens/LoginScreen';
+import LoginScreen, { SKIP_AUTH_KEY } from './screens/LoginScreen';
 import ErrorBoundary from './components/ErrorBoundary';
 import MobileDebugger from './components/MobileDebugger';
 
-const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser, authLoading } = useApp();
+const AppContent: React.FC = () => {
+  const { currentUser, authLoading, signInWithGoogle } = useApp();
+  const [skipped]   = useState(() => localStorage.getItem(SKIP_AUTH_KEY) === 'true');
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [signingIn, setSigningIn] = useState(false);
 
   if (authLoading) {
     return (
@@ -31,11 +34,59 @@ const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     );
   }
 
-  if (!currentUser) {
+  // Not signed in and didn't skip → show login screen
+  if (!currentUser && !skipped) {
     return <LoginScreen />;
   }
 
-  return <>{children}</>;
+  const handleSignInFromBanner = async () => {
+    setSigningIn(true);
+    try {
+      await signInWithGoogle();
+      localStorage.removeItem(SKIP_AUTH_KEY);
+    } catch {
+      // stay on banner
+    } finally {
+      setSigningIn(false);
+    }
+  };
+
+  return (
+    <Router>
+      {/* "Skipped auth" banner — shown until signed in or dismissed */}
+      {!currentUser && skipped && !bannerDismissed && (
+        <div className="fixed top-0 inset-x-0 z-50 flex items-center justify-between gap-3 bg-amber-500 text-white text-xs px-4 py-2">
+          <span>You're not signed in — cloud backup &amp; sync are disabled.</span>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <button
+              onClick={handleSignInFromBanner}
+              disabled={signingIn}
+              className="font-semibold underline disabled:opacity-60"
+            >
+              {signingIn ? 'Signing in…' : 'Sign in'}
+            </button>
+            <button onClick={() => setBannerDismissed(true)} className="opacity-70 hover:opacity-100">✕</button>
+          </div>
+        </div>
+      )}
+      <Layout>
+        <Routes>
+          <Route path="/" element={<Navigate to="/chat" replace />} />
+          <Route path="/chat" element={<ChatScreen />} />
+          <Route path="/history" element={<HistoryScreen />} />
+          <Route path="/ai-profile" element={<AIProfileScreen />} />
+          <Route path="/user-profile" element={<UserProfileScreen />} />
+          <Route path="/memory" element={<MemoryScreen />} />
+          <Route path="/gallery" element={<GalleryScreen />} />
+          <Route path="/image-generator" element={<ImageGeneratorScreen />} />
+          <Route path="/journal" element={<JournalScreen />} />
+          <Route path="/settings" element={<SettingsScreen />} />
+          <Route path="*" element={<Navigate to="/chat" replace />} />
+        </Routes>
+      </Layout>
+      <MobileDebugger />
+    </Router>
+  );
 };
 
 const App: React.FC = () => {
@@ -43,26 +94,7 @@ const App: React.FC = () => {
     <ErrorBoundary>
       <AppProvider>
         <ChatProvider>
-          <AuthGate>
-            <Router>
-              <Layout>
-                <Routes>
-                  <Route path="/" element={<Navigate to="/chat" replace />} />
-                  <Route path="/chat" element={<ChatScreen />} />
-                  <Route path="/history" element={<HistoryScreen />} />
-                  <Route path="/ai-profile" element={<AIProfileScreen />} />
-                  <Route path="/user-profile" element={<UserProfileScreen />} />
-                  <Route path="/memory" element={<MemoryScreen />} />
-                  <Route path="/gallery" element={<GalleryScreen />} />
-                  <Route path="/image-generator" element={<ImageGeneratorScreen />} />
-                  <Route path="/journal" element={<JournalScreen />} />
-                  <Route path="/settings" element={<SettingsScreen />} />
-                  <Route path="*" element={<Navigate to="/chat" replace />} />
-                </Routes>
-              </Layout>
-              <MobileDebugger />
-            </Router>
-          </AuthGate>
+          <AppContent />
         </ChatProvider>
       </AppProvider>
     </ErrorBoundary>
