@@ -18,10 +18,9 @@ import ErrorBoundary from './components/ErrorBoundary';
 import MobileDebugger from './components/MobileDebugger';
 
 const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser, authLoading, signInWithGoogle } = useApp();
-  const [skipped]          = useState(() => localStorage.getItem(SKIP_AUTH_KEY) === 'true');
+  const { currentUser, authLoading } = useApp();
+  const [skipped, setSkipped] = useState(() => localStorage.getItem(SKIP_AUTH_KEY) === 'true');
   const [bannerDismissed, setBannerDismissed] = useState(false);
-  const [signingIn,        setSigningIn]       = useState(false);
 
   if (authLoading) {
     return (
@@ -39,16 +38,9 @@ const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     return <LoginScreen />;
   }
 
-  const handleSignInFromBanner = async () => {
-    setSigningIn(true);
-    try {
-      await signInWithGoogle();
-      localStorage.removeItem(SKIP_AUTH_KEY);
-    } catch {
-      // stay on banner; user can retry
-    } finally {
-      setSigningIn(false);
-    }
+  const handleGoToLogin = () => {
+    localStorage.removeItem(SKIP_AUTH_KEY);
+    setSkipped(false);
   };
 
   return (
@@ -58,12 +50,8 @@ const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <div className="fixed top-0 inset-x-0 z-50 flex items-center justify-between gap-3 bg-amber-500 text-white text-xs px-4 py-2">
           <span>You're not signed in — cloud backup &amp; sync are disabled.</span>
           <div className="flex items-center gap-3 flex-shrink-0">
-            <button
-              onClick={handleSignInFromBanner}
-              disabled={signingIn}
-              className="font-semibold underline disabled:opacity-60"
-            >
-              {signingIn ? 'Signing in…' : 'Sign in'}
+            <button onClick={handleGoToLogin} className="font-semibold underline">
+              Sign in
             </button>
             <button onClick={() => setBannerDismissed(true)} className="opacity-70 hover:opacity-100">✕</button>
           </div>
