@@ -3,7 +3,6 @@ import { gzipSync, strToU8 } from 'fflate';
 import { useApp } from '../context/AppContext';
 import { useChat } from '../context/ChatContext';
 import { requestNotificationPermission } from '../services/webPushService';
-import { showNativeNotification } from '../services/notificationService';
 import { processFile } from '../services/ocrService';
 import { Download, Upload, Trash2, Bell, FileText, Key, HelpCircle, Save, Database, MapPin, Copy, Smartphone, Cloud, RefreshCw, Clock, Shield, Edit2, LogOut, User } from 'lucide-react';
 

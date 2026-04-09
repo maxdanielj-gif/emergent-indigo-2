@@ -29,9 +29,6 @@ interface AppState {
   autoSaveChatInterval: number; // in seconds
   autoJsonBackup: boolean;
   autoJsonBackupInterval: number; // in minutes
-  autoDriveBackup: boolean;
-  autoDriveBackupInterval: number; // in minutes
-  isGoogleDriveConnected: boolean;
   proactiveMessageFrequency: '1h' | '6h' | '12h' | '24h' | 'off' | 'low' | 'medium' | 'high';
   proactiveEmailFrequency: '1h' | '6h' | '12h' | '24h' | 'off' | 'low' | 'medium' | 'high';
   isSyncEnabled: boolean;
@@ -51,8 +48,6 @@ interface AppState {
   firebaseStorageBucket: string | null;
   firebaseAppId: string | null;
   firebaseMessagingSenderId: string | null;
-  googleClientId: string | null;
-  googleClientSecret: string | null;
   anthropicApiKey: string | null;
   elevenLabsApiKey: string | null;
   setElevenLabsApiKey: (key: string | null) => void;
@@ -93,7 +88,6 @@ interface AppContextType extends AppState {
   deleteProactiveCommunication: (id: string) => void;
   addToast: (toast: Omit<Toast, 'id' | 'timestamp'>) => void;
   removeToast: (id: string) => void;
-  clearAllToasts: () => void;
   resetApp: () => Promise<void>;
   exportData: (chatHistory: ChatMessage[], sessions: ChatSession[], activeSessionId: string | null) => Promise<any>;
   exportGalleryData: () => Promise<Uint8Array>;
@@ -102,7 +96,6 @@ interface AppContextType extends AppState {
   importGalleryChunks: (chunks: Uint8Array[]) => Promise<void>;
   syncGalleryToCloud: (mediaType?: 'image' | 'video') => Promise<void>;
   restoreGalleryFromCloud: (mediaType?: 'image' | 'video') => Promise<void>;
-  restoreGalleryFromDrive: (mediaType?: 'image' | 'video') => Promise<void>;
   importData: (json: string, setChatHistory: (history: ChatMessage[]) => void, setSessions: (sessions: ChatSession[]) => void, setActiveSessionId: (id: string | null) => void) => void;
   setApiKey: (key: string | null) => void;
   lastCloudSyncTime: number | null;
@@ -118,9 +111,6 @@ interface AppContextType extends AppState {
   setAutoSaveChatInterval: (interval: number) => void;
   setAutoJsonBackup: (enabled: boolean) => void;
   setAutoJsonBackupInterval: (interval: number) => void;
-  setAutoDriveBackup: (enabled: boolean) => void;
-  setAutoDriveBackupInterval: (interval: number) => void;
-  setIsGoogleDriveConnected: (connected: boolean) => void;
   setNotificationsEnabled: (enabled: boolean) => void;
   setShowTimestamps: (show: boolean) => void;
   setProactiveMessageFrequency: (frequency: '1h' | '6h' | '12h' | '24h' | 'off' | 'low' | 'medium' | 'high') => void;
@@ -139,8 +129,6 @@ interface AppContextType extends AppState {
   firebaseRestore: () => Promise<any | null>;
   firebaseGalleryBackup: (onProgress?: (done: number, total: number) => void) => Promise<number>;
   firebaseGalleryRestore: (onProgress?: (done: number, total: number) => void) => Promise<number>;
-  firebaseKbBackup: (onProgress?: (done: number, total: number) => void) => Promise<number>;
-  firebaseKbRestore: (onProgress?: (done: number, total: number) => void) => Promise<Array<{ name: string; content: string }>>;
   realTimeSyncEnabled: boolean;
   setRealTimeSyncEnabled: (enabled: boolean) => void;
   autoBackupSchedule: 'off' | 'daily' | 'weekly';
@@ -156,9 +144,6 @@ interface AppContextType extends AppState {
     storageBucket?: string | null; appId?: string | null;
     messagingSenderId?: string | null;
   }) => void;
-  googleClientId: string | null;
-  googleClientSecret: string | null;
-  setGoogleConfig: (clientId: string, clientSecret: string) => void;
   isSuccessfullyLoaded: boolean;
   isLoaded: boolean;
   lastInteractionTime: number;
@@ -298,9 +283,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [autoSaveChatInterval, setAutoSaveChatInterval] = useState(30); // Default 30 seconds
   const [autoJsonBackup, setAutoJsonBackupState] = useState(false);
   const [autoJsonBackupInterval, setAutoJsonBackupInterval] = useState(5); // Default 5 minutes
-  const [autoDriveBackup, setAutoDriveBackupState] = useState(false);
-  const [autoDriveBackupInterval, setAutoDriveBackupInterval] = useState(5); // Default 5 minutes
-  const [isGoogleDriveConnected, setIsGoogleDriveConnected] = useState(false);
   const [isSyncEnabled, setIsSyncEnabled] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncFrequency, setSyncFrequency] = useState(5); // Default 5 minutes
@@ -324,8 +306,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [firebaseAppId,            setFirebaseAppId]            = useState<string | null>(null);
   const [firebaseMessagingSenderId,setFirebaseMessagingSenderId]= useState<string | null>(null);
 
-  const [googleClientId, setGoogleClientId] = useState<string | null>(null);
-  const [googleClientSecret, setGoogleClientSecret] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [lastInteractionTime, setLastInteractionTime] = useState(Date.now());
@@ -598,8 +578,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 setFirebaseAppId(savedData.firebaseAppId || null);
                 setFirebaseMessagingSenderId(savedData.firebaseMessagingSenderId || null);
 
-                setGoogleClientId(savedData.googleClientId || null);
-                setGoogleClientSecret(savedData.googleClientSecret || null);
                 setApiKeyState(savedData.apiKey || null);
                 setFcmTokenState(savedData.fcmToken || null);
                 // Keep isDebuggerEnabled local-only to avoid sync issues during dev
@@ -610,8 +588,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 setAutoSaveChatInterval(savedData.autoSaveChatInterval !== undefined ? savedData.autoSaveChatInterval : 30);
                 setAutoJsonBackupState(savedData.autoJsonBackup !== undefined ? savedData.autoJsonBackup : false);
                 setAutoJsonBackupInterval(savedData.autoJsonBackupInterval !== undefined ? savedData.autoJsonBackupInterval : 5);
-                setAutoDriveBackupState(savedData.autoDriveBackup !== undefined ? savedData.autoDriveBackup : false);
-                setAutoDriveBackupInterval(savedData.autoDriveBackupInterval !== undefined ? savedData.autoDriveBackupInterval : 5);
                 setIsSyncEnabled(savedData.isSyncEnabled !== undefined ? savedData.isSyncEnabled : false);
                 setSyncFrequency(savedData.syncFrequency !== undefined ? savedData.syncFrequency : 5);
                 setNotificationsEnabledState(savedData.notificationsEnabled !== undefined ? savedData.notificationsEnabled : (typeof Notification !== 'undefined' && Notification.permission === 'granted'));
@@ -644,22 +620,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     loadData();
   }, []);
 
-  // Check Google Drive status on mount
-  useEffect(() => {
-    const checkDriveStatus = async () => {
-      try {
-        const res = await fetch('/api/auth/google/status', { credentials: 'include' });
-        if (res.ok) {
-          const data = await res.json();
-          setIsGoogleDriveConnected(data.isAuthenticated);
-        }
-      } catch (e) {
-        console.error("Failed to check Google Drive status", e);
-      }
-    };
-    checkDriveStatus();
-  }, []);
-
   const saveData = useCallback(async () => {
     if (!isSuccessfullyLoaded) return; // Don't save before initial load is complete
 
@@ -679,9 +639,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           autoSaveChatInterval,
           autoJsonBackup,
           autoJsonBackupInterval,
-          autoDriveBackup,
-          autoDriveBackupInterval,
-          isGoogleDriveConnected,
           isSyncEnabled,
           syncFrequency,
           proactiveMessageFrequency: aiProfile.proactiveMessageFrequency,
@@ -701,8 +658,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           firebaseStorageBucket,
           firebaseAppId,
           firebaseMessagingSenderId,
-          googleClientId,
-          googleClientSecret,
           anthropicApiKey,
           elevenLabsApiKey,
           geminiApiKey,
@@ -771,14 +726,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     // Debounce save to avoid excessive writes
-  }, [aiProfile, savedPersonas, userProfile, gallery, journal, knowledgeBase, memories, apiKey, anthropicApiKey, elevenLabsApiKey, geminiApiKey, wavespeedApiKey, fcmToken, autoSaveChat, autoJsonBackup, autoDriveBackup, isLoaded, isGoogleDriveConnected, lastInteractionTime, userId, firebaseApiKey, firebaseAuthDomain, firebaseProjectId, firebaseStorageBucket, firebaseMessagingSenderId, firebaseAppId]);
+  }, [aiProfile, savedPersonas, userProfile, gallery, journal, knowledgeBase, memories, apiKey, anthropicApiKey, elevenLabsApiKey, geminiApiKey, wavespeedApiKey, fcmToken, autoSaveChat, autoJsonBackup, isLoaded, lastInteractionTime, userId, firebaseApiKey, firebaseAuthDomain, firebaseProjectId, firebaseStorageBucket, firebaseMessagingSenderId, firebaseAppId]);
 
   // Debounce save to avoid excessive writes
   useEffect(() => {
     if (!isLoaded) return;
     const timeoutId = setTimeout(saveData, 1000);
     return () => clearTimeout(timeoutId);
-  }, [aiProfile, savedPersonas, userProfile, gallery, journal, knowledgeBase, memories, apiKey, anthropicApiKey, elevenLabsApiKey, geminiApiKey, wavespeedApiKey, fcmToken, autoSaveChat, autoJsonBackup, autoDriveBackup, isLoaded, isGoogleDriveConnected, lastInteractionTime, userId, firebaseApiKey, firebaseAuthDomain, firebaseProjectId, firebaseStorageBucket, firebaseMessagingSenderId, firebaseAppId, saveData]);
+  }, [aiProfile, savedPersonas, userProfile, gallery, journal, knowledgeBase, memories, apiKey, anthropicApiKey, elevenLabsApiKey, geminiApiKey, wavespeedApiKey, fcmToken, autoSaveChat, autoJsonBackup, isLoaded, lastInteractionTime, userId, firebaseApiKey, firebaseAuthDomain, firebaseProjectId, firebaseStorageBucket, firebaseMessagingSenderId, firebaseAppId, saveData]);
 
   // ── Gallery save — completely separate from saveData to avoid hook ordering issues.
   // Only runs when galleryLoaded is true, so it never overwrites with an empty list.
@@ -1292,10 +1247,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return added;
   };
 
-  const clearAllToasts = () => {
-    setToasts([]);
-  };
-
   const setFcmToken = (token: string | null) => {
     setFcmTokenState(token);
   };
@@ -1333,9 +1284,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       fcmToken,
       autoSaveChatInterval,
       autoJsonBackupInterval,
-      autoDriveBackup,
-      autoDriveBackupInterval,
-      isGoogleDriveConnected,
       proactiveMessageFrequency: aiProfile.proactiveMessageFrequency,
       notificationsEnabled,
       showTimestamps,
@@ -1574,88 +1522,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const restoreGalleryFromDrive = async (mediaType?: 'image' | 'video') => {
-    if (!isGoogleDriveConnected) {
-      addToast({ title: "Not Connected", message: "Please connect to Google Drive in Settings first.", type: "warning" });
-      return;
-    }
-
-    try {
-      addToast({ title: "Drive Restore", message: `Searching for ${mediaType || 'gallery'} backups on Google Drive...`, type: "info" });
-      
-      const res = await fetch(`/api/drive/files?clientId=${googleClientId}&clientSecret=${googleClientSecret}`, { credentials: 'include' });
-      if (!res.ok) throw new Error("Failed to fetch files from Google Drive");
-      
-      const { files } = await res.json();
-      if (!files || files.length === 0) {
-        addToast({ title: "No Backups Found", message: "No gallery backups found on your Google Drive.", type: "warning" });
-        return;
-      }
-
-      // Filter for this AI's backups
-      // Pattern: {aiName}_gallery_backup_{timestamp}.gz OR {aiName}_gallery_part_{n}_{timestamp}.gz
-      const aiName = aiProfile.name;
-      const backupPrefix = mediaType ? `${aiName}_gallery_backup_${mediaType}` : `${aiName}_gallery_backup`;
-      const partPrefix = mediaType ? `${aiName}_gallery_part_${mediaType}` : `${aiName}_gallery_part`;
-      
-      const myBackups = files.filter((f: any) => 
-        f.name.startsWith(aiName) && 
-        (f.name.includes(backupPrefix) || f.name.includes(partPrefix))
-      );
-      
-      if (myBackups.length === 0) {
-        addToast({ title: "No Backups Found", message: `No ${mediaType || 'gallery'} backups found for ${aiName} on Google Drive.`, type: "warning" });
-        return;
-      }
-
-      // Group by timestamp and find the latest
-      // Extract timestamp from filename. Filename ends with YYYY-MM-DD.gz
-      const getTimestamp = (name: string) => {
-        const match = name.match(/(\d{4}-\d{2}-\d{2})\.gz$/);
-        return match ? match[1] : '';
-      };
-
-      const latestTimestamp = myBackups.reduce((latest: string, f: any) => {
-        const ts = getTimestamp(f.name);
-        return ts > latest ? ts : latest;
-      }, '');
-
-      if (!latestTimestamp) {
-        addToast({ title: "Restore Failed", message: "Could not determine the latest backup timestamp.", type: "error" });
-        return;
-      }
-
-      const latestParts = myBackups.filter((f: any) => getTimestamp(f.name) === latestTimestamp);
-      
-      // Sort by part number if chunked
-      latestParts.sort((a: any, b: any) => {
-        const getPart = (name: string) => {
-          const match = name.match(/part_(\d+)/);
-          return match ? parseInt(match[1]) : 0;
-        };
-        return getPart(a.name) - getPart(b.name);
-      });
-
-      addToast({ title: "Drive Restore", message: `Downloading ${latestParts.length} parts from ${latestTimestamp}...`, type: "info" });
-      
-      const chunks: Uint8Array[] = [];
-      for (const part of latestParts) {
-        const partRes = await fetch(`/api/drive/file/${part.id}?clientId=${googleClientId}&clientSecret=${googleClientSecret}`, { credentials: 'include' });
-        if (!partRes.ok) throw new Error(`Failed to download part: ${part.name}`);
-        
-        const { content } = await partRes.json();
-        const binaryRes = await fetch(`data:application/octet-stream;base64,${content}`);
-        const blob = await binaryRes.blob();
-        chunks.push(new Uint8Array(await blob.arrayBuffer()));
-      }
-
-      await importGalleryChunks(chunks);
-    } catch (e: any) {
-      console.error("Gallery Drive restore failed", e);
-      addToast({ title: "Restore Failed", message: e.message || "An error occurred during Drive restore.", type: "error" });
-    }
-  };
-
   const importData = (
     json: string, 
     setChatHistory: (history: ChatMessage[]) => void,
@@ -1698,9 +1564,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setFcmTokenState(parsed.fcmToken || null);
       setAutoSaveChatInterval(parsed.autoSaveChatInterval !== undefined ? parsed.autoSaveChatInterval : 30);
       setAutoJsonBackupInterval(parsed.autoJsonBackupInterval !== undefined ? parsed.autoJsonBackupInterval : 5);
-      setAutoDriveBackupState(parsed.autoDriveBackup !== undefined ? parsed.autoDriveBackup : false);
-      setAutoDriveBackupInterval(parsed.autoDriveBackupInterval !== undefined ? parsed.autoDriveBackupInterval : 5);
-      setIsGoogleDriveConnected(parsed.isGoogleDriveConnected !== undefined ? parsed.isGoogleDriveConnected : false);
       setProactiveMessageFrequency(parsed.proactiveMessageFrequency !== undefined ? parsed.proactiveMessageFrequency : 'off');
       setNotificationsEnabledState(parsed.notificationsEnabled !== undefined ? parsed.notificationsEnabled : (typeof Notification !== 'undefined' && Notification.permission === 'granted'));
       setShowTimestampsState(parsed.showTimestamps !== undefined ? parsed.showTimestamps : true);
@@ -1734,7 +1597,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }).catch(() => {});
     }
   };
-  const setGoogleConfig   = (_clientId: string, _clientSecret: string) => {};
 
   // ── Firebase Auth state listener ─────────────────────────────────────────────
   useEffect(() => {
@@ -1796,7 +1658,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('indigo_user_id', id);
   };
   const setAutoJsonBackup = (enabled: boolean) => setAutoJsonBackupState(enabled);
-  const setAutoDriveBackup = (enabled: boolean) => setAutoDriveBackupState(enabled);
   const setNotificationsEnabled = (enabled: boolean) => setNotificationsEnabledState(enabled);
   const setIsDebuggerEnabled = (enabled: boolean) => {
     console.log(`setIsDebuggerEnabled called with: ${enabled}`);
@@ -1873,9 +1734,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       autoSaveChatInterval, setAutoSaveChatInterval,
       autoJsonBackup, setAutoJsonBackup,
       autoJsonBackupInterval, setAutoJsonBackupInterval,
-      autoDriveBackup, setAutoDriveBackup,
-      autoDriveBackupInterval, setAutoDriveBackupInterval,
-      isGoogleDriveConnected, setIsGoogleDriveConnected,
       isSyncEnabled, setIsSyncEnabled,
       syncFrequency, setSyncFrequency,
       notificationsEnabled, setNotificationsEnabled,
@@ -1891,7 +1749,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       backgrounds, addBackground, deleteBackground,
       firebaseApiKey, firebaseAuthDomain, firebaseProjectId, firebaseStorageBucket,
       firebaseAppId, firebaseMessagingSenderId, setFirebaseConfig,
-      googleClientId, googleClientSecret, setGoogleConfig,
       lastCloudSyncTime, lastFirebaseBackupTime, lastGalleryBackupTime,
       setLastCloudSyncTime, setLastFirebaseBackupTime, setLastGalleryBackupTime,
       anthropicApiKey, setAnthropicApiKey,
@@ -1900,8 +1757,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       wavespeedApiKey, setWavespeedApiKey,
       isLoaded, isSuccessfullyLoaded, lastInteractionTime, setLastInteractionTime,
       userId, setUserId, isSyncing, setIsSyncing,
-      exportGalleryData, exportGalleryChunks, importGalleryData, importGalleryChunks, syncGalleryToCloud, restoreGalleryFromCloud, restoreGalleryFromDrive,
-      updateAIProfile, fetchWithRetry, clearAllToasts,
+      exportGalleryData, exportGalleryChunks, importGalleryData, importGalleryChunks, syncGalleryToCloud, restoreGalleryFromCloud,
+      updateAIProfile, fetchWithRetry,
       firebaseBackup, firebaseRestore, firebaseGalleryBackup, firebaseGalleryRestore,
       autoBackupSchedule, setAutoBackupSchedule,
       realTimeSyncEnabled, setRealTimeSyncEnabled,
