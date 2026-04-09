@@ -4,7 +4,7 @@ import { useApp } from '../context/AppContext';
 import { useChat } from '../context/ChatContext';
 import { requestNotificationPermission } from '../services/webPushService';
 import { processFile } from '../services/ocrService';
-import { Download, Upload, Trash2, Bell, FileText, Key, HelpCircle, Save, Database, MapPin, Copy, Smartphone, Cloud, RefreshCw, Clock, Shield, Edit2, LogOut, User } from 'lucide-react';
+import { Download, Upload, Trash2, Bell, FileText, Key, Save, Database, MapPin, Copy, Smartphone, Cloud, RefreshCw, Clock, Shield, Edit2, LogOut, User } from 'lucide-react';
 
 const SettingsScreen: React.FC = () => {
   const {
@@ -12,7 +12,6 @@ const SettingsScreen: React.FC = () => {
     anthropicApiKey, setAnthropicApiKey,
     elevenLabsApiKey, setElevenLabsApiKey,
     geminiApiKey, setGeminiApiKey,
-    setShowTutorial,
     autoSaveChat, setAutoSaveChat, autoSaveChatInterval, setAutoSaveChatInterval,
     autoJsonBackup, setAutoJsonBackup, autoJsonBackupInterval, setAutoJsonBackupInterval,
     resetApp, aiProfile, userProfile,
@@ -1047,16 +1046,6 @@ const SettingsScreen: React.FC = () => {
               Push subscription active
             </p>
           )}
-        </section>
-
-        {/* ── Help ── */}
-        <section>
-          <h3 className="text-lg font-semibold text-indigo-900 dark:text-indigo-100 mb-4 border-b border-indigo-200 dark:border-indigo-800 pb-2">Help</h3>
-          <button onClick={() => setShowTutorial(true)}
-            className="app-btn-ghost w-full flex items-center justify-center gap-2">
-            <HelpCircle className="w-5 h-5" />
-            Start Tutorial
-          </button>
         </section>
 
         {/* ── Danger Zone ── */}
