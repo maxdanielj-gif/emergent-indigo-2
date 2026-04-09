@@ -72,12 +72,16 @@
       }
       /* Prevent overscroll bounce that makes the app feel like a webpage */
       html, body {
+        height: 100%;
         overscroll-behavior: none;
         -webkit-overflow-scrolling: touch;
       }
-      /* Respect the bottom safe area (home indicator on Android / iOS) */
+      /* Respect safe areas on all sides (status bar top, home indicator bottom) */
       #root {
+        padding-top: env(safe-area-inset-top, 0px);
         padding-bottom: env(safe-area-inset-bottom, 0px);
+        box-sizing: border-box;
+        height: 100%;
       }
     </style>
   </head>
