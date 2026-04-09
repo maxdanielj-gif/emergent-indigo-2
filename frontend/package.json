@@ -1,8 +1,0 @@
-{
-  "name": "indigo-ai-launcher",
-  "version": "0.0.0",
-  "private": true,
-  "scripts": {
-    "start": "bash -c 'cd /app && NODE_ENV=development exec node_modules/.bin/tsx watch server.ts'"
-  }
-}
