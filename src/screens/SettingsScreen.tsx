@@ -65,15 +65,6 @@ const SettingsScreen: React.FC = () => {
   const [fullRestoreStep,      setFullRestoreStep]       = useState<string | null>(null);
   const [showRestoreConfirm,   setShowRestoreConfirm]   = useState(false);
 
-  // Firebase is ready if the UI fields are filled OR if env vars provide the values.
-  // This mirrors the buildConfig() fallback in firebaseService.ts.
-  const fbConfigReady = !!(
-    (localFbApiKey   || import.meta.env.VITE_FIREBASE_API_KEY) &&
-    (localFbProjectId|| import.meta.env.VITE_FIREBASE_PROJECT_ID) &&
-    (localFbAppId    || import.meta.env.VITE_FIREBASE_APP_ID)
-  );
-  const fbStorageReady = !!(localFbStorageBucket || import.meta.env.VITE_FIREBASE_STORAGE_BUCKET);
-
   // Local state for Firebase config fields (never bind inputs directly to context state)
   const [localFbApiKey,       setLocalFbApiKey]       = useState(firebaseApiKey       || '');
   const [localFbAuthDomain,   setLocalFbAuthDomain]   = useState(firebaseAuthDomain   || '');
@@ -83,6 +74,15 @@ const SettingsScreen: React.FC = () => {
   const [localFbAppId,        setLocalFbAppId]        = useState(firebaseAppId        || '');
   const [localFbVapidKey,     setLocalFbVapidKey]     = useState(firebaseVapidKey     || '');
   const [localFbServiceKey,   setLocalFbServiceKey]   = useState(firebaseServiceAccountKey || '');
+
+  // Firebase is ready if the UI fields are filled OR if env vars provide the values.
+  // This mirrors the buildConfig() fallback in firebaseService.ts.
+  const fbConfigReady = !!(
+    (localFbApiKey   || import.meta.env.VITE_FIREBASE_API_KEY) &&
+    (localFbProjectId|| import.meta.env.VITE_FIREBASE_PROJECT_ID) &&
+    (localFbAppId    || import.meta.env.VITE_FIREBASE_APP_ID)
+  );
+  const fbStorageReady = !!(localFbStorageBucket || import.meta.env.VITE_FIREBASE_STORAGE_BUCKET);
 
   // Sync local firebase fields when context loads from IndexedDB
   React.useEffect(() => { setLocalFbApiKey(firebaseApiKey || ''); },              [firebaseApiKey]);
