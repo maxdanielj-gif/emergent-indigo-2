@@ -605,15 +605,6 @@ app.post("/api/sync", express.raw({ type: "*/*", limit: "500mb" }), async (req, 
   res.json({ status: "ok", lastSync: cloudSyncData[id].lastSync });
 });
 
-app.get("/api/debug-sync", (_req, res) => {
-  res.json(
-    Object.keys(cloudSyncData).map((key) => ({
-      key,
-      aiProfileId: cloudSyncData[key].aiProfile?.id,
-    }))
-  );
-});
-
 app.get("/api/sync/:userId?", (req, res) => {
   const userId = req.params.userId?.trim();
   if (!userId) return res.status(400).json({ error: "User ID is required" });
@@ -731,11 +722,6 @@ const WAVESPEED_MODELS = {
     { id: "wavespeed-ai/flux-2-klein-9b/edit",             name: "Flux 2 Klein 9B Edit",         hasLora: false, maxImages: 3 },
   ],
 };
-
-// List available WaveSpeed models
-app.get("/api/wavespeed/models", (_req, res) => {
-  res.json(WAVESPEED_MODELS);
-});
 
 // Submit WaveSpeed image generation task
 app.post("/api/wavespeed/generate", express.json({ limit: "20mb" }), async (req, res) => {

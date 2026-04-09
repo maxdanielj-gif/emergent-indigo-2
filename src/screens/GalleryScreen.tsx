@@ -85,8 +85,8 @@ const GalleryScreen: React.FC = () => {
   const { 
     gallery, deleteImageFromGallery, deleteImagesFromGallery, addToGallery, timeZone, 
     exportGalleryData, exportGalleryChunks, importGalleryData, importGalleryChunks, 
-    syncGalleryToCloud, restoreGalleryFromCloud, restoreGalleryFromDrive,
-    isGoogleDriveConnected, googleClientId, googleClientSecret, addToast, aiProfile,
+    syncGalleryToCloud, restoreGalleryFromCloud,
+    addToast, aiProfile,
     galleryLoaded, loadGallery
   } = useApp();
 
@@ -427,76 +427,6 @@ const GalleryScreen: React.FC = () => {
     if (galleryBackupRef.current) galleryBackupRef.current.value = '';
   };
 
-  const handleBackupToDrive = async (mediaType?: 'image' | 'video') => {
-    if (!isGoogleDriveConnected) {
-      addToast({ title: "Not Connected", message: "Please connect to Google Drive in Settings first.", type: "warning" });
-      return;
-    }
-
-    try {
-      setIsBackingUp(true);
-      setActiveOp(`drive_${mediaType || 'all'}`);
-      addToast({ title: "Backup Started", message: `Preparing your ${mediaType || 'gallery'} chunks for Google Drive...`, type: "info" });
-      setBackupStatus("Creating gallery chunks...");
-      
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      const chunks = await exportGalleryChunks(5, mediaType); 
-      
-      if (chunks.length === 0) {
-        addToast({ title: "Backup", message: `No ${mediaType || 'gallery'} items to backup.`, type: "info" });
-        return;
-      }
-
-      const now = new Date();
-      const timestamp = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
-      const typeSuffix = mediaType ? `_${mediaType}` : '';
-
-      for (let i = 0; i < chunks.length; i++) {
-        setBackupStatus(`Uploading chunk ${i + 1} of ${chunks.length}...`);
-        
-        const blob = new Blob([chunks[i]]);
-        const base64 = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            const dataUrl = reader.result as string;
-            resolve(dataUrl.split(',')[1]);
-          };
-          reader.readAsDataURL(blob);
-        });
-        
-        const filename = `${aiProfile.name}_gallery_part${typeSuffix}_${i + 1}_${timestamp}.gz`;
-
-        const res = await fetch('/api/drive/upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ 
-            filename, 
-            content: base64,
-            isBinary: true,
-            clientId: googleClientId,
-            clientSecret: googleClientSecret
-          }),
-        });
-
-        if (!res.ok) {
-          const errorText = await res.text();
-          throw new Error(`Failed to upload chunk ${i + 1}: ${errorText}`);
-        }
-      }
-
-      addToast({ title: "Drive Backup", message: `${mediaType ? (mediaType.charAt(0).toUpperCase() + mediaType.slice(1)) : 'Gallery'} successfully backed up to Google Drive in ${chunks.length} parts!`, type: "success" });
-    } catch (e: any) {
-      console.error("Drive gallery backup failed", e);
-      addToast({ title: "Drive Backup Failed", message: e.message || "An error occurred during upload.", type: "error" });
-    } finally {
-      setIsBackingUp(false);
-      setBackupStatus(null);
-      setActiveOp(null);
-    }
-  };
-
   const handleCloudSync = async (mediaType?: 'image' | 'video') => {
     try {
       setIsBackingUp(true);
@@ -527,20 +457,7 @@ const GalleryScreen: React.FC = () => {
     }
   };
 
-  const handleDriveRestore = async (mediaType?: 'image' | 'video') => {
-    try {
-      setIsBackingUp(true);
-      setActiveOp(`drive_restore_${mediaType || 'all'}`);
-      addToast({ title: "Drive Restore", message: `Starting ${mediaType || 'gallery'} restoration from Google Drive...`, type: "info" });
-      await new Promise(resolve => setTimeout(resolve, 600));
-      setBackupStatus(`Restoring ${mediaType || 'gallery'} from Google Drive...`);
-      await restoreGalleryFromDrive(mediaType);
-    } finally {
-      setIsBackingUp(false);
-      setBackupStatus(null);
-      setActiveOp(null);
-    }
-  };
+
 
   const handleCopyPrompt = (prompt: string) => {
     navigator.clipboard.writeText(prompt).then(() => {
@@ -674,26 +591,6 @@ const GalleryScreen: React.FC = () => {
                   {activeOp === 'cloud_restore_image' ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <CloudDownload className="w-4 h-4 mr-1.5" />}
                   Cloud Download
               </button>
-              {isGoogleDriveConnected && (
-                <>
-                  <button
-                      onClick={() => handleBackupToDrive('image')}
-                      disabled={isBackingUp}
-                      className="flex items-center px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-xs font-bold min-h-[36px] disabled:bg-indigo-400"
-                  >
-                      {activeOp === 'drive_image' ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <CloudUpload className="w-4 h-4 mr-1.5" />}
-                      Drive Upload
-                  </button>
-                  <button
-                      onClick={() => handleDriveRestore('image')}
-                      disabled={isBackingUp}
-                      className="flex items-center px-3 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors text-xs font-bold min-h-[36px] disabled:opacity-50"
-                  >
-                      {activeOp === 'drive_restore_image' ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <CloudDownload className="w-4 h-4 mr-1.5" />}
-                      Drive Download
-                  </button>
-                </>
-              )}
           </div>
         </div>
 
