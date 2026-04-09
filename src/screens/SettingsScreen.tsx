@@ -13,7 +13,6 @@ const SettingsScreen: React.FC = () => {
     anthropicApiKey, setAnthropicApiKey,
     elevenLabsApiKey, setElevenLabsApiKey,
     geminiApiKey, setGeminiApiKey,
-    wavespeedApiKey, setWavespeedApiKey,
     mongoUri, setMongoUri,
     setShowTutorial,
     autoSaveChat, setAutoSaveChat, autoSaveChatInterval, setAutoSaveChatInterval,
@@ -52,7 +51,6 @@ const SettingsScreen: React.FC = () => {
   const [localAnthropicApiKey,    setLocalAnthropicApiKey]    = useState(anthropicApiKey || '');
   const [localElevenLabsApiKey,   setLocalElevenLabsApiKey]   = useState(elevenLabsApiKey || '');
   const [localGeminiApiKey,       setLocalGeminiApiKey]       = useState(geminiApiKey || '');
-  const [localWavespeedApiKey,  setLocalWavespeedApiKey]  = useState(wavespeedApiKey  || '');
   const [localMongoUri,         setLocalMongoUri]         = useState(mongoUri         || '');
   const [isApplyingMongo,       setIsApplyingMongo]       = useState(false);
   const [isFirebaseBackingUp,  setIsFirebaseBackingUp]  = useState(false);
@@ -98,13 +96,10 @@ const SettingsScreen: React.FC = () => {
   React.useEffect(() => { setLocalAnthropicApiKey(anthropicApiKey || ''); }, [anthropicApiKey]);
   React.useEffect(() => { setLocalElevenLabsApiKey(elevenLabsApiKey || ''); }, [elevenLabsApiKey]);
   React.useEffect(() => { setLocalGeminiApiKey(geminiApiKey || ''); }, [geminiApiKey]);
-  React.useEffect(() => { setLocalWavespeedApiKey(wavespeedApiKey || ''); }, [wavespeedApiKey]);
   React.useEffect(() => { setLocalMongoUri(mongoUri || ''); }, [mongoUri]);
   const [localSyncId,          setLocalSyncId]          = useState(userId || '');
-  const [recoveryId,           setRecoveryId]           = useState('');
   const [isExporting,          setIsExporting]          = useState(false);
   const [isImporting,          setIsImporting]          = useState(false);
-  const [showOverwriteConfirm, setShowOverwriteConfirm] = useState(false);
   const [isTestingProactive,   setIsTestingProactive]   = useState(false);
 
   // Keep local sync ID in step with context userId
@@ -127,25 +122,6 @@ const SettingsScreen: React.FC = () => {
       addToast({ title: 'Sync', message: 'Data synced to cloud!', type: 'success' });
     } catch (e: any) {
       addToast({ title: 'Sync Failed', message: e.message || 'Unknown error', type: 'error' });
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  const handleRecover = async () => {
-    if (!recoveryId.trim()) {
-      addToast({ title: 'Recovery', message: 'Enter a Sync ID first.', type: 'warning' });
-      return;
-    }
-    setIsSyncing(true);
-    try {
-      const res = await fetch(`/api/sync/${recoveryId}`);
-      if (!res.ok) throw new Error('Recovery failed');
-      const data = await res.json();
-      importData(JSON.stringify(data), setChatHistory, setSessions, setActiveSessionId);
-      addToast({ title: 'Recovery', message: 'Data recovered from cloud!', type: 'success' });
-    } catch (e: any) {
-      addToast({ title: 'Recovery Failed', message: e.message || 'Unknown error', type: 'error' });
     } finally {
       setIsSyncing(false);
     }
@@ -177,10 +153,6 @@ const SettingsScreen: React.FC = () => {
     addToast({ title: 'Saved', message: 'Gemini API key saved.', type: 'success' });
   };
 
-  const handleSaveWavespeedKey = () => {
-    setWavespeedApiKey(localWavespeedApiKey.trim() || null);
-    addToast({ title: 'Saved', message: 'WaveSpeed API key saved.', type: 'success' });
-  };
   const handleSaveFirebaseConfig = () => {
     setFirebaseConfig({
       apiKey:            localFbApiKey.trim()        || null,
@@ -635,28 +607,6 @@ const SettingsScreen: React.FC = () => {
               </p>
             </div>
 
-            {/* WaveSpeed */}
-            <div>
-              <label className="block text-sm font-medium text-indigo-700 dark:text-indigo-300 mb-1">
-                WaveSpeed API Key <span className="text-indigo-400 dark:text-indigo-500 font-normal">(for WaveSpeed image/video models)</span>
-              </label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-400" />
-                  <input
-                    type="password"
-                    value={localWavespeedApiKey}
-                    onChange={(e) => setLocalWavespeedApiKey(e.target.value)}
-                    placeholder="Your WaveSpeed API key"
-                    className="app-input pl-9"
-                  />
-                </div>
-                <button onClick={handleSaveWavespeedKey} className="app-btn-primary">Save</button>
-              </div>
-              <p className="text-xs text-indigo-500 dark:text-indigo-400 mt-1">
-                Get a key at <a href="https://wavespeed.ai/accesskey" target="_blank" rel="noreferrer" className="underline">wavespeed.ai/accesskey</a>. Enables WaveSpeed image editing and video generation. Requires a top-up to activate.
-              </p>
-            </div>
 
           </div>
         </section>
@@ -732,29 +682,6 @@ const SettingsScreen: React.FC = () => {
                   Last synced: {timeAgo(lastCloudSyncTime)}
                 </p>
               )}
-            </div>
-
-            {/* Recovery */}
-            <div>
-              <label className="block text-xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider mb-1">Data Recovery</label>
-              <p className="text-xs text-indigo-500 dark:text-indigo-400 mb-2">Restore your data from the cloud using a Sync ID.</p>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={recoveryId}
-                  onChange={(e) => setRecoveryId(e.target.value)}
-                  placeholder="Enter Sync ID to recover"
-                  className="app-input flex-1 font-mono text-sm"
-                />
-                <button
-                  onClick={() => { if (!recoveryId) return; if (chatHistory.length > 0) setShowOverwriteConfirm(true); else handleRecover(); }}
-                  disabled={isSyncing || !recoveryId}
-                  className="app-btn-primary flex items-center gap-1"
-                >
-                  <Download className="w-4 h-4" />
-                  Recover
-                </button>
-              </div>
             </div>
 
           </div>
@@ -1278,19 +1205,6 @@ const SettingsScreen: React.FC = () => {
 
       </div>
 
-      {/* Overwrite confirm modal */}
-      {showOverwriteConfirm && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-indigo-950 p-6 rounded-2xl shadow-2xl max-w-sm w-full border border-indigo-100 dark:border-indigo-800">
-            <h3 className="text-lg font-bold mb-3 text-indigo-900 dark:text-indigo-100">Overwrite current chat?</h3>
-            <p className="mb-5 text-sm text-indigo-600 dark:text-indigo-400">You have an active chat. Recovering will replace it with cloud data.</p>
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setShowOverwriteConfirm(false)} className="app-btn-ghost">Cancel</button>
-              <button onClick={() => { setShowOverwriteConfirm(false); handleRecover(); }} className="app-btn-primary">Overwrite</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
