@@ -13,7 +13,6 @@ const SettingsScreen: React.FC = () => {
     anthropicApiKey, setAnthropicApiKey,
     elevenLabsApiKey, setElevenLabsApiKey,
     geminiApiKey, setGeminiApiKey,
-    mongoUri, setMongoUri,
     setShowTutorial,
     autoSaveChat, setAutoSaveChat, autoSaveChatInterval, setAutoSaveChatInterval,
     autoJsonBackup, setAutoJsonBackup, autoJsonBackupInterval, setAutoJsonBackupInterval,
@@ -50,8 +49,6 @@ const SettingsScreen: React.FC = () => {
   const [localAnthropicApiKey,    setLocalAnthropicApiKey]    = useState(anthropicApiKey || '');
   const [localElevenLabsApiKey,   setLocalElevenLabsApiKey]   = useState(elevenLabsApiKey || '');
   const [localGeminiApiKey,       setLocalGeminiApiKey]       = useState(geminiApiKey || '');
-  const [localMongoUri,         setLocalMongoUri]         = useState(mongoUri         || '');
-  const [isApplyingMongo,       setIsApplyingMongo]       = useState(false);
   const [isFirebaseBackingUp,  setIsFirebaseBackingUp]  = useState(false);
   const [isFirebaseRestoring,  setIsFirebaseRestoring]  = useState(false);
   const [isGalleryBackingUp,   setIsGalleryBackingUp]   = useState(false);
@@ -91,7 +88,6 @@ const SettingsScreen: React.FC = () => {
   React.useEffect(() => { setLocalAnthropicApiKey(anthropicApiKey || ''); }, [anthropicApiKey]);
   React.useEffect(() => { setLocalElevenLabsApiKey(elevenLabsApiKey || ''); }, [elevenLabsApiKey]);
   React.useEffect(() => { setLocalGeminiApiKey(geminiApiKey || ''); }, [geminiApiKey]);
-  React.useEffect(() => { setLocalMongoUri(mongoUri || ''); }, [mongoUri]);
   const [localSyncId,          setLocalSyncId]          = useState(userId || '');
   const [isExporting,          setIsExporting]          = useState(false);
   const [isImporting,          setIsImporting]          = useState(false);
@@ -159,26 +155,6 @@ const SettingsScreen: React.FC = () => {
     });
     addToast({ title: 'Firebase Config Saved', message: 'Firebase configuration saved and ready for backup/restore.', type: 'success' });
   };
-  const handleApplyMongoUri = async () => {
-    if (!localMongoUri.trim()) return;
-    setIsApplyingMongo(true);
-    try {
-      const res = await fetch('/api/config/set-mongo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mongoUrl: localMongoUri.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed');
-      setMongoUri(localMongoUri.trim());
-      addToast({ title: 'MongoDB updated', message: data.message, type: 'success' });
-    } catch (e: any) {
-      addToast({ title: 'MongoDB update failed', message: e.message, type: 'error' });
-    } finally {
-      setIsApplyingMongo(false);
-    }
-  };
-
   const handleFirebaseBackup = async () => {
     if (!fbConfigReady) {
       addToast({ title: 'Firebase not configured', message: 'Fill in API Key, Project ID and App ID in the Firebase Configuration section above, then save.', type: 'error' });
@@ -677,84 +653,6 @@ const SettingsScreen: React.FC = () => {
               )}
             </div>
 
-          </div>
-        </section>
-
-        {/* ── MongoDB Configuration ── */}
-        <section>
-          <h3 className="text-lg font-semibold text-indigo-900 dark:text-indigo-100 mb-4 border-b border-indigo-200 dark:border-indigo-800 pb-2">MongoDB Configuration</h3>
-          <div className="space-y-3">
-            <p className="text-sm text-indigo-600 dark:text-indigo-400">
-              Override the built-in MongoDB connection. Use your own Atlas cluster URI for persistent personal storage.
-            </p>
-            <div>
-              <label className="block text-sm font-medium text-indigo-700 dark:text-indigo-300 mb-1">
-                MongoDB Connection URI
-              </label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Database className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-400" />
-                  <input
-                    type="password"
-                    value={localMongoUri}
-                    onChange={(e) => setLocalMongoUri(e.target.value)}
-                    placeholder="mongodb+srv://user:pass@cluster.mongodb.net/dbname"
-                    data-testid="mongo-uri-input"
-                    className="app-input pl-9 font-mono text-xs"
-                  />
-                </div>
-                <button
-                  onClick={handleApplyMongoUri}
-                  disabled={isApplyingMongo || !localMongoUri.trim()}
-                  data-testid="mongo-uri-apply"
-                  className="app-btn-primary disabled:opacity-50 flex items-center gap-1.5">
-                  {isApplyingMongo ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" />Applying…</> : 'Apply'}
-                </button>
-              </div>
-              <p className="text-xs text-indigo-500 dark:text-indigo-400 mt-1">
-                Reconnects immediately and saves to server config. Leave blank to use the default built-in MongoDB.
-              </p>
-            </div>
-
-            {/* MongoDB Export / Import */}
-            <div className="border-t border-indigo-100 dark:border-indigo-800 pt-3 space-y-2">
-              <p className="text-sm font-medium text-indigo-700 dark:text-indigo-300">Export / Import MongoDB Data</p>
-              <p className="text-xs text-indigo-500 dark:text-indigo-400">Download all your cloud-synced data as a JSON file, or restore from a previous export.</p>
-              <div className="flex gap-2">
-                <button
-                  data-testid="mongo-export-btn"
-                  onClick={async () => {
-                    if (!userId) { addToast({ title: 'Export failed', message: 'No user ID found. Enable sync first.', type: 'error' }); return; }
-                    const res = await fetch(`/api/db/export/${userId}`);
-                    if (!res.ok) { addToast({ title: 'Export failed', message: await res.text(), type: 'error' }); return; }
-                    const blob = await res.blob();
-                    const url  = URL.createObjectURL(blob);
-                    const a    = document.createElement('a');
-                    a.href     = url; a.download = `indigo-mongodb-backup-${Date.now()}.json`;
-                    a.click(); URL.revokeObjectURL(url);
-                    addToast({ title: 'Export complete', message: 'MongoDB data downloaded.', type: 'success' });
-                  }}
-                  className="app-btn-secondary flex items-center gap-1.5">
-                  <Download className="w-3.5 h-3.5" /> Export JSON
-                </button>
-                <label className="app-btn-secondary flex items-center gap-1.5 cursor-pointer">
-                  <Upload className="w-3.5 h-3.5" /> Import JSON
-                  <input type="file" accept=".json" className="hidden" onChange={async (e) => {
-                    const file = e.target.files?.[0]; if (!file) return;
-                    if (!userId) { addToast({ title: 'Import failed', message: 'No user ID found.', type: 'error' }); return; }
-                    try {
-                      const text = await file.text();
-                      const parsed = JSON.parse(text);
-                      const data = parsed.data || parsed; // support both wrapped and raw
-                      const res = await fetch('/api/db/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId, data }) });
-                      if (!res.ok) { addToast({ title: 'Import failed', message: (await res.json()).error, type: 'error' }); return; }
-                      addToast({ title: 'Import complete', message: 'Data restored from backup. Reload the page to see changes.', type: 'success' });
-                    } catch { addToast({ title: 'Import failed', message: 'Invalid JSON file.', type: 'error' }); }
-                    e.target.value = '';
-                  }} />
-                </label>
-              </div>
-            </div>
           </div>
         </section>
 

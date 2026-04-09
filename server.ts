@@ -11,8 +11,6 @@ import { fileURLToPath } from "url";
 import { Readable } from "stream";
 import Anthropic from "@anthropic-ai/sdk";
 import webpush from "web-push";
-import { MongoClient, Db, Collection } from "mongodb";
-
 dotenv.config();
 
 // ── Global error handlers ─────────────────────────────────────────────────────
@@ -185,43 +183,15 @@ if (!fs.existsSync(path.join(__dirname, "data"))) {
 
 let cloudSyncData: Record<string, any> = {};
 
-// ── MongoDB sync storage ──────────────────────────────────────────────────────
-let mongoDb: Db | null = null;
-let syncCollection: Collection | null = null;
-
-async function connectMongo() {
+// Load existing sync data from JSON file on startup
+if (fs.existsSync(SYNC_DATA_PATH)) {
   try {
-    const mongoUrl = process.env.MONGO_URL || "mongodb://localhost:27017";
-    const dbName   = process.env.DB_NAME   || "indigo_ai";
-    const client   = new MongoClient(mongoUrl);
-    await client.connect();
-    mongoDb        = client.db(dbName);
-    syncCollection = mongoDb.collection("sync_data");
-    await syncCollection.createIndex({ userId: 1 }, { unique: true });
-    console.log("MongoDB connected for cloud sync");
-
-    // Load existing sync data into memory (limit to 1000 users on startup; rest loaded on demand)
-    const docs = await syncCollection.find({}, { projection: { userId: 1, data: 1 } }).limit(1000).toArray();
-    for (const doc of docs) {
-      if (doc.userId) cloudSyncData[doc.userId] = doc.data;
-    }
-    console.log(`Loaded ${docs.length} user records from MongoDB`);
+    cloudSyncData = JSON.parse(fs.readFileSync(SYNC_DATA_PATH, "utf-8"));
+    console.log("Loaded sync data from JSON file");
   } catch (e) {
-    console.error("MongoDB connection failed, falling back to JSON file:", e);
-    // Fall back to JSON file
-    if (fs.existsSync(SYNC_DATA_PATH)) {
-      try {
-        cloudSyncData = JSON.parse(fs.readFileSync(SYNC_DATA_PATH, "utf-8"));
-        console.log("Loaded sync data from JSON fallback");
-      } catch (jsonErr) {
-        console.error("Failed to load JSON fallback:", jsonErr);
-      }
-    }
+    console.error("Failed to load sync data:", e);
   }
 }
-
-// Start MongoDB connection
-connectMongo();
 
 let isSaving = false;
 let pendingSave = false;
@@ -233,24 +203,10 @@ const saveSyncData = async () => {
   isSaving = true;
   pendingSave = false;
   try {
-    if (syncCollection) {
-      // Save all dirty entries to MongoDB
-      const ops = Object.entries(cloudSyncData).map(([userId, data]) => ({
-        updateOne: {
-          filter: { userId },
-          update: { $set: { userId, data, lastSync: Date.now() } },
-          upsert: true,
-        },
-      }));
-      if (ops.length > 0) await syncCollection.bulkWrite(ops as any);
-    } else {
-      // JSON file fallback
-      const data = JSON.stringify(cloudSyncData);
-      const tempPath = SYNC_DATA_PATH + ".tmp";
-      await fs.promises.writeFile(tempPath, data);
-      await fs.promises.rename(tempPath, SYNC_DATA_PATH);
-      console.log(`Sync data saved to JSON (${(data.length / 1024 / 1024).toFixed(2)} MB)`);
-    }
+    const data = JSON.stringify(cloudSyncData);
+    const tempPath = SYNC_DATA_PATH + ".tmp";
+    await fs.promises.writeFile(tempPath, data);
+    await fs.promises.rename(tempPath, SYNC_DATA_PATH);
   } catch (e) {
     console.error("Failed to save sync data:", e);
   } finally {
@@ -666,25 +622,6 @@ app.get("/api/sync/:userId?", (req, res) => {
   res.json(data);
 });
 
-// ── MongoDB Export / Import ──────────────────────────────────────────────────
-app.get("/api/db/export/:userId", (req, res) => {
-  const userId = req.params.userId?.trim();
-  if (!userId) return res.status(400).json({ error: "User ID required" });
-  const data = cloudSyncData[userId];
-  if (!data) return res.status(404).json({ error: "No data found for this user" });
-  res.setHeader("Content-Disposition", `attachment; filename="indigo-backup-${userId.slice(0,8)}-${Date.now()}.json"`);
-  res.setHeader("Content-Type", "application/json");
-  res.send(JSON.stringify({ version: 1, userId, exportedAt: new Date().toISOString(), data }, null, 2));
-});
-
-app.post("/api/db/import", express.json({ limit: "50mb" }), async (req, res) => {
-  const { userId, data } = req.body;
-  if (!userId || !data) return res.status(400).json({ error: "userId and data are required" });
-  cloudSyncData[userId] = data;
-  await saveSyncData();
-  res.json({ success: true, message: "Data imported successfully" });
-});
-
 // ── Claude AI: main chat ──────────────────────────────────────────────────────
 app.post("/api/chat", async (req, res) => {
   const { messages, aiProfile, userProfile, anthropicKey: clientKey, geminiKey, timeZone, attachments } = req.body;
@@ -916,37 +853,6 @@ app.get("/api/wavespeed/status/:taskId", async (req, res) => {
     res.status(500).json({ error: e.message || "Failed to check status." });
   }
 });
-
-
-// ── Runtime config: update MongoDB URI ───────────────────────────────────────
-app.post("/api/config/set-mongo", express.json(), async (req, res) => {
-  const { mongoUrl } = req.body;
-  if (!mongoUrl?.trim()) return res.status(400).json({ error: "mongoUrl is required." });
-
-  try {
-    // Reconnect to the new MongoDB URI
-    process.env.MONGO_URL = mongoUrl.trim();
-    await connectMongo();
-
-    // Persist to .env so it survives restarts
-    const envPath = path.join(__dirname, ".env");
-    let envContent = "";
-    try { envContent = fs.readFileSync(envPath, "utf-8"); } catch {}
-    if (envContent.includes("MONGO_URL=")) {
-      envContent = envContent.replace(/^MONGO_URL=.*/m, `MONGO_URL=${mongoUrl.trim()}`);
-    } else {
-      envContent += `\nMONGO_URL=${mongoUrl.trim()}`;
-    }
-    fs.writeFileSync(envPath, envContent);
-
-    console.log(`MongoDB URI updated to: ${mongoUrl.trim().replace(/:([^@]+)@/, ":***@")}`);
-    res.json({ success: true, message: "MongoDB reconnected and .env updated." });
-  } catch (e: any) {
-    console.error("Failed to update MongoDB URI:", e);
-    res.status(500).json({ error: e.message || "Failed to reconnect to MongoDB." });
-  }
-});
-
 
 
 app.post("/api/analyze-persona", async (req, res) => {

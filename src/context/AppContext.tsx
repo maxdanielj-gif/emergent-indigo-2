@@ -105,8 +105,6 @@ interface AppContextType extends AppState {
   restoreGalleryFromDrive: (mediaType?: 'image' | 'video') => Promise<void>;
   importData: (json: string, setChatHistory: (history: ChatMessage[]) => void, setSessions: (sessions: ChatSession[]) => void, setActiveSessionId: (id: string | null) => void) => void;
   setApiKey: (key: string | null) => void;
-  mongoUri: string | null;
-  setMongoUri: (uri: string | null) => void;
   lastCloudSyncTime: number | null;
   lastFirebaseBackupTime: number | null;
   lastGalleryBackupTime: number | null;
@@ -287,7 +285,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [proactiveCommunications, setProactiveCommunications] = useState<ProactiveCommunication[]>([]);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [apiKey, setApiKeyState] = useState<string | null>(null);
-  const [mongoUri,         setMongoUriState]          = useState<string | null>(null);
   const [lastCloudSyncTime,      setLastCloudSyncTimeState]      = useState<number | null>(null);
   const [lastFirebaseBackupTime, setLastFirebaseBackupTimeState] = useState<number | null>(null);
   const [lastGalleryBackupTime,  setLastGalleryBackupTimeState]  = useState<number | null>(null);
@@ -588,7 +585,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 setElevenLabsApiKeyState(savedData.elevenLabsApiKey || null);
                 setGeminiApiKeyState(savedData.geminiApiKey || null);
                 setWavespeedApiKeyState(savedData.wavespeedApiKey || null);
-                setMongoUriState(savedData.mongoUri || null);
+
                 setLastCloudSyncTimeState(savedData.lastCloudSyncTime || null);
                 setLastFirebaseBackupTimeState(savedData.lastFirebaseBackupTime || null);
                 setLastGalleryBackupTimeState(savedData.lastGalleryBackupTime || null);
@@ -710,7 +707,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           elevenLabsApiKey,
           geminiApiKey,
           wavespeedApiKey,
-          mongoUri,
           lastCloudSyncTime,
           lastFirebaseBackupTime,
           lastGalleryBackupTime,
@@ -775,14 +771,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     // Debounce save to avoid excessive writes
-  }, [aiProfile, savedPersonas, userProfile, gallery, journal, knowledgeBase, memories, apiKey, anthropicApiKey, elevenLabsApiKey, geminiApiKey, wavespeedApiKey, fcmToken, autoSaveChat, autoJsonBackup, autoDriveBackup, isLoaded, isGoogleDriveConnected, lastInteractionTime, userId, firebaseApiKey, firebaseAuthDomain, firebaseProjectId, firebaseStorageBucket, firebaseMessagingSenderId, firebaseAppId, mongoUri]);
+  }, [aiProfile, savedPersonas, userProfile, gallery, journal, knowledgeBase, memories, apiKey, anthropicApiKey, elevenLabsApiKey, geminiApiKey, wavespeedApiKey, fcmToken, autoSaveChat, autoJsonBackup, autoDriveBackup, isLoaded, isGoogleDriveConnected, lastInteractionTime, userId, firebaseApiKey, firebaseAuthDomain, firebaseProjectId, firebaseStorageBucket, firebaseMessagingSenderId, firebaseAppId]);
 
   // Debounce save to avoid excessive writes
   useEffect(() => {
     if (!isLoaded) return;
     const timeoutId = setTimeout(saveData, 1000);
     return () => clearTimeout(timeoutId);
-  }, [aiProfile, savedPersonas, userProfile, gallery, journal, knowledgeBase, memories, apiKey, anthropicApiKey, elevenLabsApiKey, geminiApiKey, wavespeedApiKey, fcmToken, autoSaveChat, autoJsonBackup, autoDriveBackup, isLoaded, isGoogleDriveConnected, lastInteractionTime, userId, firebaseApiKey, firebaseAuthDomain, firebaseProjectId, firebaseStorageBucket, firebaseMessagingSenderId, firebaseAppId, mongoUri, saveData]);
+  }, [aiProfile, savedPersonas, userProfile, gallery, journal, knowledgeBase, memories, apiKey, anthropicApiKey, elevenLabsApiKey, geminiApiKey, wavespeedApiKey, fcmToken, autoSaveChat, autoJsonBackup, autoDriveBackup, isLoaded, isGoogleDriveConnected, lastInteractionTime, userId, firebaseApiKey, firebaseAuthDomain, firebaseProjectId, firebaseStorageBucket, firebaseMessagingSenderId, firebaseAppId, saveData]);
 
   // ── Gallery save — completely separate from saveData to avoid hook ordering issues.
   // Only runs when galleryLoaded is true, so it never overwrites with an empty list.
@@ -878,7 +874,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           gallery,
           apiKey, anthropicApiKey, elevenLabsApiKey, geminiApiKey,
           wavespeedApiKey,
-          mongoUri,
           autoSaveChat, autoBackupSchedule,
         }, firebaseRuntimeConfig);
         const ts = Date.now();
@@ -921,7 +916,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           gallery,
           apiKey, anthropicApiKey, elevenLabsApiKey, geminiApiKey,
           wavespeedApiKey,
-          mongoUri,
           autoSaveChat, autoBackupSchedule, realTimeSyncEnabled,
         }, firebaseRuntimeConfig);
         console.log('[Indigo] Real-time sync → Firestore complete');
@@ -1196,14 +1190,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const setApiKey = (key: string | null) => {
       setApiKeyState(key);
-  };
-
-  const setMongoUri = (uri: string | null) => {
-    setMongoUriState(uri);
-    // Directly patch IDB because saveData closure has stale mongoUri at call time
-    loadFromDB('indigo_app_data_core').then((core: any) => {
-      if (core) saveToDB('indigo_app_data_core', { ...core, mongoUri: uri });
-    }).catch(() => {});
   };
 
   const setLastCloudSyncTime = (t: number | null) => {
@@ -1906,7 +1892,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       firebaseApiKey, firebaseAuthDomain, firebaseProjectId, firebaseStorageBucket,
       firebaseAppId, firebaseMessagingSenderId, setFirebaseConfig,
       googleClientId, googleClientSecret, setGoogleConfig,
-      mongoUri, setMongoUri,
       lastCloudSyncTime, lastFirebaseBackupTime, lastGalleryBackupTime,
       setLastCloudSyncTime, setLastFirebaseBackupTime, setLastGalleryBackupTime,
       anthropicApiKey, setAnthropicApiKey,
