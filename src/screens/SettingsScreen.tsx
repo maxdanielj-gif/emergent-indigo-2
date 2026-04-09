@@ -65,6 +65,15 @@ const SettingsScreen: React.FC = () => {
   const [fullRestoreStep,      setFullRestoreStep]       = useState<string | null>(null);
   const [showRestoreConfirm,   setShowRestoreConfirm]   = useState(false);
 
+  // Firebase is ready if the UI fields are filled OR if env vars provide the values.
+  // This mirrors the buildConfig() fallback in firebaseService.ts.
+  const fbConfigReady = !!(
+    (localFbApiKey   || import.meta.env.VITE_FIREBASE_API_KEY) &&
+    (localFbProjectId|| import.meta.env.VITE_FIREBASE_PROJECT_ID) &&
+    (localFbAppId    || import.meta.env.VITE_FIREBASE_APP_ID)
+  );
+  const fbStorageReady = !!(localFbStorageBucket || import.meta.env.VITE_FIREBASE_STORAGE_BUCKET);
+
   // Local state for Firebase config fields (never bind inputs directly to context state)
   const [localFbApiKey,       setLocalFbApiKey]       = useState(firebaseApiKey       || '');
   const [localFbAuthDomain,   setLocalFbAuthDomain]   = useState(firebaseAuthDomain   || '');
@@ -206,13 +215,8 @@ const SettingsScreen: React.FC = () => {
   };
 
   const handleFirebaseBackup = async () => {
-    // Pre-flight: check Firebase config fields are filled
-    if (!localFbApiKey || !localFbProjectId || !localFbAppId) {
+    if (!fbConfigReady) {
       addToast({ title: 'Firebase not configured', message: 'Fill in API Key, Project ID and App ID in the Firebase Configuration section above, then save.', type: 'error' });
-      return;
-    }
-    if (!userId) {
-      addToast({ title: 'User ID required', message: 'Set a User ID in the Cloud Sync section before backing up.', type: 'error' });
       return;
     }
     setIsFirebaseBackingUp(true);
@@ -260,15 +264,11 @@ const SettingsScreen: React.FC = () => {
   };
 
   const handleGalleryFirebaseBackup = async () => {
-    if (!localFbApiKey || !localFbProjectId || !localFbAppId) {
+    if (!fbConfigReady) {
       addToast({ title: 'Firebase not configured', message: 'Fill in API Key, Project ID and App ID in Firebase Configuration and save first.', type: 'error' });
       return;
     }
-    if (!userId) {
-      addToast({ title: 'User ID required', message: 'Set a User ID in Cloud Sync before backing up.', type: 'error' });
-      return;
-    }
-    if (!localFbStorageBucket) {
+    if (!fbStorageReady) {
       addToast({ title: 'Storage Bucket required', message: 'Fill in the Firebase Storage Bucket field (e.g. your-project.appspot.com) in Firebase Configuration.', type: 'error' });
       return;
     }
@@ -291,12 +291,8 @@ const SettingsScreen: React.FC = () => {
 
   // ── Full restore: Firestore (all app data) + Storage (gallery images) ────────
   const handleFullFirebaseRestore = async () => {
-    if (!localFbApiKey || !localFbProjectId || !localFbAppId) {
+    if (!fbConfigReady) {
       addToast({ title: 'Firebase not configured', message: 'Fill in API Key, Project ID and App ID in Firebase Configuration and save first.', type: 'error' });
-      return;
-    }
-    if (!userId) {
-      addToast({ title: 'User ID required', message: 'Set a User ID in Cloud Sync before restoring.', type: 'error' });
       return;
     }
     setIsFullRestoring(true);
@@ -341,15 +337,12 @@ const SettingsScreen: React.FC = () => {
     }
   };
 
-  const handleGalleryFirebaseRestore = async () => {    if (!localFbApiKey || !localFbProjectId || !localFbAppId) {
+  const handleGalleryFirebaseRestore = async () => {
+    if (!fbConfigReady) {
       addToast({ title: 'Firebase not configured', message: 'Fill in API Key, Project ID and App ID in Firebase Configuration and save first.', type: 'error' });
       return;
     }
-    if (!userId) {
-      addToast({ title: 'User ID required', message: 'Set a User ID in Cloud Sync before restoring.', type: 'error' });
-      return;
-    }
-    if (!localFbStorageBucket) {
+    if (!fbStorageReady) {
       addToast({ title: 'Storage Bucket required', message: 'Fill in the Firebase Storage Bucket field to restore gallery images.', type: 'error' });
       return;
     }
@@ -912,12 +905,12 @@ const SettingsScreen: React.FC = () => {
               <div>
                 <p className="text-xs font-medium text-indigo-700 dark:text-indigo-300 mb-1.5">App Data (Firestore)</p>
                 <div className="flex gap-3">
-                  <button onClick={handleFirebaseBackup} disabled={isFirebaseBackingUp || !userId}
+                  <button onClick={handleFirebaseBackup} disabled={isFirebaseBackingUp || !fbConfigReady}
                     data-testid="firebase-backup-btn"
                     className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm">
                     {isFirebaseBackingUp ? <><RefreshCw className="w-4 h-4 animate-spin" />Backing up…</> : 'Backup to Firestore'}
                   </button>
-                  <button onClick={handleFirebaseRestore} disabled={isFirebaseRestoring || !userId}
+                  <button onClick={handleFirebaseRestore} disabled={isFirebaseRestoring || !fbConfigReady}
                     data-testid="firebase-restore-btn"
                     className="flex-1 py-2.5 bg-white dark:bg-indigo-900 border border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 rounded-xl font-medium hover:bg-indigo-50 dark:hover:bg-indigo-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm">
                     {isFirebaseRestoring ? <><RefreshCw className="w-4 h-4 animate-spin" />Restoring…</> : 'Restore from Firestore'}
@@ -985,7 +978,7 @@ const SettingsScreen: React.FC = () => {
                   <div>
                     <button
                       onClick={handleGalleryFirebaseBackup}
-                      disabled={isGalleryBackingUp || !userId || gallery.length === 0}
+                      disabled={isGalleryBackingUp || !fbConfigReady || gallery.length === 0}
                       data-testid="firebase-gallery-backup-btn"
                       className="w-full py-2.5 bg-indigo-500 text-white rounded-xl font-medium hover:bg-indigo-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm">
                       {isGalleryBackingUp ? (
@@ -1007,7 +1000,7 @@ const SettingsScreen: React.FC = () => {
                   <div>
                     <button
                       onClick={handleGalleryFirebaseRestore}
-                      disabled={isGalleryRestoring || !userId}
+                      disabled={isGalleryRestoring || !fbConfigReady}
                       data-testid="firebase-gallery-restore-btn"
                       className="w-full py-2.5 bg-white dark:bg-indigo-900 border border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 rounded-xl font-medium hover:bg-indigo-50 dark:hover:bg-indigo-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm">
                       {isGalleryRestoring ? (
