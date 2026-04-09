@@ -103,6 +103,18 @@ export function onAuthStateChange(
   return onAuthStateChanged(auth, callback);
 }
 
+// ── Firestore sanitizer: removes undefined values (Firestore rejects them) ────
+function sanitize(value: any): any {
+  if (value === undefined) return null;
+  if (value === null || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map(sanitize);
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([, v]) => v !== undefined)
+      .map(([k, v]) => [k, sanitize(v)])
+  );
+}
+
 // ── Backup app data to Firestore ──────────────────────────────────────────────
 export async function backupToFirestore(
   userId: string,
@@ -112,8 +124,9 @@ export async function backupToFirestore(
   if (!userId?.trim()) throw new Error("A User ID is required. Set one in Settings → Cloud Sync.");
 
   const db = getDb(runtime);
-  const { gallery, ...safeData } = data;
+  const { gallery, ...rawData } = data;
   const galleryIds = Array.isArray(gallery) ? gallery.map((g: any) => g.id) : [];
+  const safeData = sanitize(rawData);
 
   await setDoc(doc(db, 'indigo_backups', userId.trim()), {
     ...safeData,
