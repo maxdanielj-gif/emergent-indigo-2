@@ -32,7 +32,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   };
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-transparent text-indigo-900 dark:text-indigo-50 font-sans">
+    <div className="flex flex-col h-full bg-transparent text-indigo-900 dark:text-indigo-50 font-sans">
       <ToastContainer />
       {/* Header with Hamburger */}
       <header className="bg-indigo-50 dark:bg-indigo-950 text-indigo-900 dark:text-indigo-50 p-4 flex items-center justify-between shadow-md z-20 border-b border-indigo-200 dark:border-indigo-800">
