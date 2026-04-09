@@ -32,8 +32,7 @@ const SettingsScreen: React.FC = () => {
     firebaseBackup, firebaseRestore, firebaseGalleryBackup, firebaseGalleryRestore,
     firebaseApiKey, firebaseAuthDomain, firebaseProjectId,
     firebaseStorageBucket, firebaseMessagingSenderId, firebaseAppId,
-    firebaseVapidKey, firebaseServiceAccountKey,
-    setFirebaseConfig, setFirebaseServiceAccountKey,
+    setFirebaseConfig,
     currentUser, signOut,
     lastCloudSyncTime, setLastCloudSyncTime,
     lastFirebaseBackupTime, setLastFirebaseBackupTime,
@@ -70,8 +69,6 @@ const SettingsScreen: React.FC = () => {
   const [localFbStorageBucket,setLocalFbStorageBucket]= useState(firebaseStorageBucket|| '');
   const [localFbSenderId,     setLocalFbSenderId]     = useState(firebaseMessagingSenderId || '');
   const [localFbAppId,        setLocalFbAppId]        = useState(firebaseAppId        || '');
-  const [localFbVapidKey,     setLocalFbVapidKey]     = useState(firebaseVapidKey     || '');
-  const [localFbServiceKey,   setLocalFbServiceKey]   = useState(firebaseServiceAccountKey || '');
 
   // Firebase is ready if the UI fields are filled OR if env vars provide the values.
   // This mirrors the buildConfig() fallback in firebaseService.ts.
@@ -89,8 +86,6 @@ const SettingsScreen: React.FC = () => {
   React.useEffect(() => { setLocalFbStorageBucket(firebaseStorageBucket || ''); },[firebaseStorageBucket]);
   React.useEffect(() => { setLocalFbSenderId(firebaseMessagingSenderId || ''); }, [firebaseMessagingSenderId]);
   React.useEffect(() => { setLocalFbAppId(firebaseAppId || ''); },                [firebaseAppId]);
-  React.useEffect(() => { setLocalFbVapidKey(firebaseVapidKey || ''); },          [firebaseVapidKey]);
-  React.useEffect(() => { setLocalFbServiceKey(firebaseServiceAccountKey || ''); },[firebaseServiceAccountKey]);
 
   // Sync local key fields once the context loads saved values from IndexedDB
   React.useEffect(() => { setLocalAnthropicApiKey(anthropicApiKey || ''); }, [anthropicApiKey]);
@@ -161,9 +156,7 @@ const SettingsScreen: React.FC = () => {
       storageBucket:     localFbStorageBucket.trim() || null,
       messagingSenderId: localFbSenderId.trim()      || null,
       appId:             localFbAppId.trim()          || null,
-      vapidKey:          localFbVapidKey.trim()       || null,
     });
-    setFirebaseServiceAccountKey(localFbServiceKey.trim() || null);
     addToast({ title: 'Firebase Config Saved', message: 'Firebase configuration saved and ready for backup/restore.', type: 'success' });
   };
   const handleApplyMongoUri = async () => {
@@ -784,7 +777,6 @@ const SettingsScreen: React.FC = () => {
                 { label: 'Storage Bucket',       key: 'storageBucket',     val: localFbStorageBucket,set: setLocalFbStorageBucket,ph: 'project.firebasestorage.app' },
                 { label: 'Messaging Sender ID',  key: 'messagingSenderId', val: localFbSenderId,     set: setLocalFbSenderId,     ph: '123456789012' },
                 { label: 'App ID',               key: 'appId',             val: localFbAppId,        set: setLocalFbAppId,        ph: '1:123:web:abc123' },
-                { label: 'VAPID Key',            key: 'vapidKey',          val: localFbVapidKey,     set: setLocalFbVapidKey,     ph: 'BJ...' },
               ].map(({ label, key, val, set, ph }) => (
                 <div key={key}>
                   <label className="block text-xs font-medium text-indigo-700 dark:text-indigo-300 mb-1">{label}</label>
@@ -798,21 +790,6 @@ const SettingsScreen: React.FC = () => {
                   />
                 </div>
               ))}
-            </div>
-
-            {/* Service Account Key — full-width textarea */}
-            <div>
-              <label className="block text-xs font-medium text-indigo-700 dark:text-indigo-300 mb-1">
-                Service Account Key <span className="font-normal text-indigo-400">(optional — for server-side operations)</span>
-              </label>
-              <textarea
-                value={localFbServiceKey}
-                onChange={(e) => setLocalFbServiceKey(e.target.value)}
-                placeholder={'{\n  "type": "service_account",\n  "project_id": "...",\n  ...\n}'}
-                rows={4}
-                data-testid="firebase-serviceAccountKey-input"
-                className="w-full p-2 border border-indigo-300 dark:border-indigo-700 rounded-xl bg-white dark:bg-indigo-950 text-indigo-900 dark:text-indigo-100 text-xs font-mono focus:ring-2 focus:ring-indigo-500 outline-none resize-y"
-              />
             </div>
 
             <button

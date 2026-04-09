@@ -51,8 +51,6 @@ interface AppState {
   firebaseStorageBucket: string | null;
   firebaseAppId: string | null;
   firebaseMessagingSenderId: string | null;
-  firebaseVapidKey: string | null;
-  firebaseServiceAccountKey: string | null;
   googleClientId: string | null;
   googleClientSecret: string | null;
   anthropicApiKey: string | null;
@@ -155,14 +153,11 @@ interface AppContextType extends AppState {
   firebaseStorageBucket: string | null;
   firebaseAppId: string | null;
   firebaseMessagingSenderId: string | null;
-  firebaseVapidKey: string | null;
-  firebaseServiceAccountKey: string | null;
   setFirebaseConfig: (config: {
     apiKey?: string | null; authDomain?: string | null; projectId?: string | null;
     storageBucket?: string | null; appId?: string | null;
-    messagingSenderId?: string | null; vapidKey?: string | null;
+    messagingSenderId?: string | null;
   }) => void;
-  setFirebaseServiceAccountKey: (key: string | null) => void;
   googleClientId: string | null;
   googleClientSecret: string | null;
   setGoogleConfig: (clientId: string, clientSecret: string) => void;
@@ -331,8 +326,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [firebaseStorageBucket,    setFirebaseStorageBucket]    = useState<string | null>(null);
   const [firebaseAppId,            setFirebaseAppId]            = useState<string | null>(null);
   const [firebaseMessagingSenderId,setFirebaseMessagingSenderId]= useState<string | null>(null);
-  const [firebaseVapidKey,         setFirebaseVapidKey]         = useState<string | null>(null);
-  const [firebaseServiceAccountKey,setFirebaseServiceAccountKey]= useState<string | null>(null);
+
   const [googleClientId, setGoogleClientId] = useState<string | null>(null);
   const [googleClientSecret, setGoogleClientSecret] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
@@ -606,8 +600,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 setFirebaseStorageBucket(savedData.firebaseStorageBucket || null);
                 setFirebaseAppId(savedData.firebaseAppId || null);
                 setFirebaseMessagingSenderId(savedData.firebaseMessagingSenderId || null);
-                setFirebaseVapidKey(savedData.firebaseVapidKey || null);
-                setFirebaseServiceAccountKey(savedData.firebaseServiceAccountKey || null);
+
                 setGoogleClientId(savedData.googleClientId || null);
                 setGoogleClientSecret(savedData.googleClientSecret || null);
                 setApiKeyState(savedData.apiKey || null);
@@ -711,8 +704,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           firebaseStorageBucket,
           firebaseAppId,
           firebaseMessagingSenderId,
-          firebaseVapidKey,
-          firebaseServiceAccountKey,
           googleClientId,
           googleClientSecret,
           anthropicApiKey,
@@ -784,14 +775,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     // Debounce save to avoid excessive writes
-  }, [aiProfile, savedPersonas, userProfile, gallery, journal, knowledgeBase, memories, apiKey, anthropicApiKey, elevenLabsApiKey, geminiApiKey, wavespeedApiKey, fcmToken, autoSaveChat, autoJsonBackup, autoDriveBackup, isLoaded, isGoogleDriveConnected, lastInteractionTime, userId, firebaseApiKey, firebaseAuthDomain, firebaseProjectId, firebaseStorageBucket, firebaseMessagingSenderId, firebaseAppId, firebaseVapidKey, firebaseServiceAccountKey, mongoUri]);
+  }, [aiProfile, savedPersonas, userProfile, gallery, journal, knowledgeBase, memories, apiKey, anthropicApiKey, elevenLabsApiKey, geminiApiKey, wavespeedApiKey, fcmToken, autoSaveChat, autoJsonBackup, autoDriveBackup, isLoaded, isGoogleDriveConnected, lastInteractionTime, userId, firebaseApiKey, firebaseAuthDomain, firebaseProjectId, firebaseStorageBucket, firebaseMessagingSenderId, firebaseAppId, mongoUri]);
 
   // Debounce save to avoid excessive writes
   useEffect(() => {
     if (!isLoaded) return;
     const timeoutId = setTimeout(saveData, 1000);
     return () => clearTimeout(timeoutId);
-  }, [aiProfile, savedPersonas, userProfile, gallery, journal, knowledgeBase, memories, apiKey, anthropicApiKey, elevenLabsApiKey, geminiApiKey, wavespeedApiKey, fcmToken, autoSaveChat, autoJsonBackup, autoDriveBackup, isLoaded, isGoogleDriveConnected, lastInteractionTime, userId, firebaseApiKey, firebaseAuthDomain, firebaseProjectId, firebaseStorageBucket, firebaseMessagingSenderId, firebaseAppId, firebaseVapidKey, firebaseServiceAccountKey, mongoUri, saveData]);
+  }, [aiProfile, savedPersonas, userProfile, gallery, journal, knowledgeBase, memories, apiKey, anthropicApiKey, elevenLabsApiKey, geminiApiKey, wavespeedApiKey, fcmToken, autoSaveChat, autoJsonBackup, autoDriveBackup, isLoaded, isGoogleDriveConnected, lastInteractionTime, userId, firebaseApiKey, firebaseAuthDomain, firebaseProjectId, firebaseStorageBucket, firebaseMessagingSenderId, firebaseAppId, mongoUri, saveData]);
 
   // ── Gallery save — completely separate from saveData to avoid hook ordering issues.
   // Only runs when galleryLoaded is true, so it never overwrites with an empty list.
@@ -1740,7 +1731,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const setFirebaseConfig = (config: {
     apiKey?: string | null; authDomain?: string | null; projectId?: string | null;
     storageBucket?: string | null; appId?: string | null;
-    messagingSenderId?: string | null; vapidKey?: string | null;
+    messagingSenderId?: string | null;
   }) => {
     // Update React state for each provided field, then patch IDB directly
     // (same pattern as setMongoUri / setAnthropicApiKey to avoid stale closure issues)
@@ -1751,7 +1742,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (config.storageBucket    !== undefined) { setFirebaseStorageBucket(config.storageBucket);       updates.firebaseStorageBucket    = config.storageBucket; }
     if (config.appId            !== undefined) { setFirebaseAppId(config.appId);                       updates.firebaseAppId            = config.appId; }
     if (config.messagingSenderId !== undefined){ setFirebaseMessagingSenderId(config.messagingSenderId);updates.firebaseMessagingSenderId = config.messagingSenderId; }
-    if (config.vapidKey         !== undefined) { setFirebaseVapidKey(config.vapidKey);                 updates.firebaseVapidKey         = config.vapidKey; }
     if (Object.keys(updates).length > 0) {
       loadFromDB('indigo_app_data_core').then((core: any) => {
         if (core) saveToDB('indigo_app_data_core', { ...core, ...updates });
@@ -1914,8 +1904,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       timeZone, setTimeZone,
       backgrounds, addBackground, deleteBackground,
       firebaseApiKey, firebaseAuthDomain, firebaseProjectId, firebaseStorageBucket,
-      firebaseAppId, firebaseMessagingSenderId, firebaseVapidKey, setFirebaseConfig,
-      firebaseServiceAccountKey, setFirebaseServiceAccountKey,
+      firebaseAppId, firebaseMessagingSenderId, setFirebaseConfig,
       googleClientId, googleClientSecret, setGoogleConfig,
       mongoUri, setMongoUri,
       lastCloudSyncTime, lastFirebaseBackupTime, lastGalleryBackupTime,
