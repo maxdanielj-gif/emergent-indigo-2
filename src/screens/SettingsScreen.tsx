@@ -4,7 +4,7 @@ import { useApp } from '../context/AppContext';
 import { useChat } from '../context/ChatContext';
 import { requestNotificationPermission } from '../services/webPushService';
 import { processFile } from '../services/ocrService';
-import { Download, Upload, Trash2, Bell, FileText, Key, Save, Database, MapPin, Copy, Smartphone, Cloud, RefreshCw, Clock, Shield, Edit2, LogOut, User } from 'lucide-react';
+import { Download, Upload, Trash2, Bell, FileText, Key, Save, Database, Smartphone, Cloud, RefreshCw, Clock, Shield, Edit2, LogOut, User, AlertCircle } from 'lucide-react';
 
 const SettingsScreen: React.FC = () => {
   const {
@@ -452,18 +452,6 @@ const SettingsScreen: React.FC = () => {
     } finally { setIsImporting(false); }
   };
 
-  // ── Browser tools ─────────────────────────────────────────────────
-  const handleLocation = () => {
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (p) => addToast({ title: 'Location', message: `${p.coords.latitude.toFixed(4)}, ${p.coords.longitude.toFixed(4)}`, type: 'info' }),
-        (err) => addToast({ title: 'Location Error', message: err.message, type: 'error' })
-      );
-    } else {
-      addToast({ title: 'Not Supported', message: 'Geolocation not available.', type: 'warning' });
-    }
-  };
-
   const handleStorageCheck = async () => {
     if ('storage' in navigator && 'estimate' in navigator.storage) {
       const { usage, quota } = await navigator.storage.estimate();
@@ -473,17 +461,6 @@ const SettingsScreen: React.FC = () => {
     } else {
       addToast({ title: 'Not Supported', message: 'Storage estimation not available.', type: 'warning' });
     }
-  };
-
-  const handleClipboardCopy = async () => {
-    setIsExporting(true);
-    try {
-      const data = await exportData(chatHistory, sessions, activeSessionId);
-      await navigator.clipboard.writeText(JSON.stringify(data));
-      addToast({ title: 'Copied', message: 'Data copied to clipboard.', type: 'success' });
-    } catch {
-      addToast({ title: 'Failed', message: 'Clipboard copy failed.', type: 'error' });
-    } finally { setIsExporting(false); }
   };
 
   // ── JSX ───────────────────────────────────────────────────────────
@@ -1013,26 +990,36 @@ const SettingsScreen: React.FC = () => {
         {/* ── Browser Tools ── */}
         <section>
           <h3 className="text-lg font-semibold text-indigo-900 dark:text-indigo-100 mb-4 border-b border-indigo-200 dark:border-indigo-800 pb-2">Browser Tools</h3>
+
+          {/* Push notifications — prominent warning when not yet enabled */}
+          {!fcmToken && (
+            <div className="mb-4 flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-xl">
+              <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Push notifications are off</p>
+                <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                  Enable push to receive auto-backup alerts and AI messages. Tap the button below — your browser will ask for permission.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <button onClick={handleLocation}
-              className="flex flex-col items-center justify-center p-4 border border-indigo-200 dark:border-indigo-800 rounded-xl bg-white dark:bg-indigo-950 hover:bg-indigo-50 dark:hover:bg-indigo-900 transition-all">
-              <MapPin className="w-5 h-5 mb-1 text-indigo-400" />
-              <span className="text-xs text-indigo-700 dark:text-indigo-300">Location</span>
-            </button>
-            <button onClick={handleClipboardCopy} disabled={isExporting}
-              className="flex flex-col items-center justify-center p-4 border border-indigo-200 dark:border-indigo-800 rounded-xl bg-white dark:bg-indigo-950 hover:bg-indigo-50 dark:hover:bg-indigo-900 transition-all disabled:opacity-50">
-              {isExporting ? <RefreshCw className="w-5 h-5 mb-1 text-indigo-400 animate-spin" /> : <Copy className="w-5 h-5 mb-1 text-indigo-400" />}
-              <span className="text-xs text-indigo-700 dark:text-indigo-300">Copy Data</span>
-            </button>
             <button onClick={handleStorageCheck}
               className="flex flex-col items-center justify-center p-4 border border-indigo-200 dark:border-indigo-800 rounded-xl bg-white dark:bg-indigo-950 hover:bg-indigo-50 dark:hover:bg-indigo-900 transition-all">
               <Database className="w-5 h-5 mb-1 text-indigo-400" />
               <span className="text-xs text-indigo-700 dark:text-indigo-300">Storage</span>
             </button>
             <button onClick={handleEnablePush}
-              className="flex flex-col items-center justify-center p-4 border border-indigo-200 dark:border-indigo-800 rounded-xl bg-white dark:bg-indigo-950 hover:bg-indigo-50 dark:hover:bg-indigo-900 transition-all">
-              <Smartphone className="w-5 h-5 mb-1 text-indigo-400" />
-              <span className="text-xs text-indigo-700 dark:text-indigo-300">Enable Push</span>
+              className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all ${
+                fcmToken
+                  ? 'border-indigo-200 dark:border-indigo-800 bg-white dark:bg-indigo-950 hover:bg-indigo-50 dark:hover:bg-indigo-900'
+                  : 'border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/30 hover:bg-amber-100 dark:hover:bg-amber-900/50'
+              }`}>
+              <Smartphone className={`w-5 h-5 mb-1 ${fcmToken ? 'text-indigo-400' : 'text-amber-500'}`} />
+              <span className={`text-xs font-medium ${fcmToken ? 'text-indigo-700 dark:text-indigo-300' : 'text-amber-700 dark:text-amber-400'}`}>
+                Enable Push
+              </span>
             </button>
             <button onClick={handleTestPush}
               className="flex flex-col items-center justify-center p-4 border border-indigo-200 dark:border-indigo-800 rounded-xl bg-white dark:bg-indigo-950 hover:bg-indigo-50 dark:hover:bg-indigo-900 transition-all">
@@ -1040,10 +1027,16 @@ const SettingsScreen: React.FC = () => {
               <span className="text-xs text-indigo-700 dark:text-indigo-300">Test Push</span>
             </button>
           </div>
-          {fcmToken && (
+
+          {fcmToken ? (
             <p className="mt-3 text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
-              Push subscription active
+              Push notifications active
+            </p>
+          ) : (
+            <p className="mt-3 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-amber-500 inline-block" />
+              Push notifications not enabled
             </p>
           )}
         </section>
