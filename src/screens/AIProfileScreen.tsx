@@ -47,7 +47,7 @@ const AIProfileScreen: React.FC = () => {
   const [voicePitch, setVoicePitch] = useState(aiProfile.voicePitch || 1.0);
   const [voiceSpeed, setVoiceSpeed] = useState(aiProfile.voiceSpeed || 1.0);
   const [autoReadMessages, setAutoReadMessages] = useState(aiProfile.autoReadMessages || false);
-  const [voiceGender, setVoiceGender] = useState<'male' | 'female' | 'none'>(aiProfile.voiceGender || 'none');
+
   const [voiceDescription, setVoiceDescription] = useState(aiProfile.voiceDescription || '');
   const [voiceProvider, setVoiceProvider] = useState<'browser' | 'elevenlabs'>(
     (aiProfile.voiceProvider === 'elevenlabs') ? 'elevenlabs' : 'browser'
@@ -154,10 +154,6 @@ const AIProfileScreen: React.FC = () => {
     if (voiceURI) {
         selectedVoice = availableVoices.find(v => v.voiceURI === voiceURI);
     }
-    if (!selectedVoice && voiceGender !== 'none') {
-        const genderFilter = voiceGender === 'male' ? 'male' : 'female';
-        selectedVoice = availableVoices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes(genderFilter));
-    }
     if (selectedVoice) utterance.voice = selectedVoice;
 
     utterance.pitch = voicePitch;
@@ -181,7 +177,7 @@ const AIProfileScreen: React.FC = () => {
     setVoicePitch(aiProfile.voicePitch || 1.0);
     setVoiceSpeed(aiProfile.voiceSpeed || 1.0);
     setAutoReadMessages(aiProfile.autoReadMessages || false);
-    setVoiceGender(aiProfile.voiceGender || 'none');
+
     setVoiceDescription(aiProfile.voiceDescription || '');
     setVoiceProvider((aiProfile.voiceProvider === 'elevenlabs') ? 'elevenlabs' : 'browser');
     setResponseLength(aiProfile.responseLength || 'medium');
@@ -256,7 +252,6 @@ const AIProfileScreen: React.FC = () => {
       voicePitch,
       voiceSpeed,
       autoReadMessages,
-      voiceGender,
       voiceDescription,
       voiceProvider,
       responseLength,
@@ -328,7 +323,6 @@ const AIProfileScreen: React.FC = () => {
       voicePitch,
       voiceSpeed,
       autoReadMessages,
-      voiceGender,
       voiceDescription,
       voiceProvider,
       responseLength,
@@ -398,7 +392,6 @@ const AIProfileScreen: React.FC = () => {
         voicePitch: 1.0,
         voiceSpeed: 1.0,
         autoReadMessages: false,
-        voiceGender: 'none',
         voiceDescription: '',
         voiceProvider: 'browser',
         responseLength: 'medium',
@@ -532,7 +525,6 @@ const AIProfileScreen: React.FC = () => {
         voicePitch,
         voiceSpeed,
         autoReadMessages,
-        voiceGender,
         voiceDescription,
         voiceProvider,
         responseLength,
@@ -1446,7 +1438,7 @@ const AIProfileScreen: React.FC = () => {
                                 </div>
                             ) : (
                                 <div className="p-4 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 rounded-lg space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 gap-4">
                                         <div>
                                             <label className="block text-sm font-medium text-indigo-700 dark:text-indigo-300 mb-1">Browser Voice</label>
                                             <div className="flex space-x-2">
@@ -1471,18 +1463,6 @@ const AIProfileScreen: React.FC = () => {
                                                     <Play className="w-5 h-5" />
                                                 </button>
                                             </div>
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-indigo-700 dark:text-indigo-300 mb-1">Voice Gender (Local Only)</label>
-                                            <select
-                                            value={voiceGender}
-                                            onChange={(e) => setVoiceGender(e.target.value as 'male' | 'female' | 'none')}
-                                            className="w-full p-2 border border-indigo-300 dark:border-indigo-700 rounded-md bg-white dark:bg-indigo-950 text-indigo-900 dark:text-indigo-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                            >
-                                            <option value="none">None / Neutral</option>
-                                            <option value="male">Male</option>
-                                            <option value="female">Female</option>
-                                            </select>
                                         </div>
                                     </div>
                                 </div>
