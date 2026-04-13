@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { generateElevenLabsSpeech, listElevenLabsVoices } from '../services/asyncService';
 import { useApp } from '../context/AppContext';
 import { useChat } from '../context/ChatContext';
-import { AIProfile, Background, ChatMessage, ChatSession } from '../types';
+import { AIProfile, ChatMessage, ChatSession } from '../types';
 import { 
   Upload, 
   Plus, 
@@ -106,12 +106,10 @@ const AIProfileScreen: React.FC = () => {
   const [ambientFrequencyState, setAmbientFrequencyState] = useState<AIProfile['ambientFrequency']>(aiProfile.ambientFrequency || 'off');
   const [imageStyle, setImageStyle] = useState<string>(aiProfile.imageStyle || 'none');
   const [imageGenerationInstructions, setImageGenerationInstructions] = useState<string[]>(aiProfile.imageGenerationInstructions || []);
-  const [backgroundImages, setBackgroundImages] = useState<Background[]>(aiProfile.backgroundImages || []);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [referenceImage, setReferenceImage] = useState<string | null>(aiProfile.referenceImage);
   const [isTestingVoice, setIsTestingVoice] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const backgroundInputRef = useRef<HTMLInputElement>(null);
   
   // Preview Chat State
   const [previewInput, setPreviewInput] = useState('');
@@ -292,7 +290,6 @@ const AIProfileScreen: React.FC = () => {
       aiCanUseBlogger,
       imageStyle,
       imageGenerationInstructions,
-      backgroundImages,
       aiCanGenerateSpeech,
       textOnlyMode,
       elevenLabsModelId,
@@ -364,7 +361,6 @@ const AIProfileScreen: React.FC = () => {
       aiCanUseBlogger,
       imageStyle,
       imageGenerationInstructions,
-      backgroundImages,
       aiCanGenerateSpeech,
       textOnlyMode,
       elevenLabsModelId,
@@ -405,7 +401,6 @@ const AIProfileScreen: React.FC = () => {
         voiceGender: 'none',
         voiceDescription: '',
         voiceProvider: 'browser',
-        backgroundImages: [],
         responseLength: 'medium',
         responseDetail: 'medium',
         responseTone: 'friendly',
@@ -523,35 +518,6 @@ const AIProfileScreen: React.FC = () => {
     }
   }, []);
 
-  const handleBackgroundUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result as string;
-      const name = file.name.split('.')[0];
-      const newBackground: Background = {
-        id: Date.now().toString(),
-        name: name.charAt(0).toUpperCase() + name.slice(1),
-        url: base64,
-        category: 'Other',
-        timestamp: Date.now()
-      };
-      setBackgroundImages(prev => [...prev, newBackground]);
-    };
-    reader.readAsDataURL(file);
-    if (backgroundInputRef.current) backgroundInputRef.current.value = '';
-  }, []);
-
-  const removeBackground = useCallback((id: string) => {
-    setBackgroundImages(prev => prev.filter(bg => bg.id !== id));
-  }, []);
-
-  const updateBackgroundName = useCallback((id: string, newName: string) => {
-    setBackgroundImages(prev => prev.map(bg => bg.id === id ? { ...bg, name: newName } : bg));
-  }, []);
-
   const handleExport = useCallback(() => {
     try {
       // Create a complete profile object for export including current form state and chat data
@@ -585,7 +551,6 @@ const AIProfileScreen: React.FC = () => {
         ambientFrequency: ambientFrequencyState,
         aiCanGenerateImages: aiProfile.aiCanGenerateImages,
         imageStyle,
-        backgroundImages,
         // Include chat data for this persona
         chatHistory,
         sessions,
@@ -893,63 +858,6 @@ const AIProfileScreen: React.FC = () => {
                 />
                 </div>
 
-                {/* Background References Section */}
-                <div className="bg-indigo-50 dark:bg-indigo-900/30 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800">
-                    <div className="flex items-center justify-between mb-3">
-                        <div>
-                            <h3 className="text-sm font-semibold text-indigo-900 dark:text-indigo-100 flex items-center gap-2">
-                                <ImageIcon className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                                Background References
-                            </h3>
-                            <p className="text-xs text-indigo-500 dark:text-indigo-400">Upload images of rooms (bedroom, living room, etc.) for consistent backgrounds.</p>
-                        </div>
-                        <button
-                            onClick={() => backgroundInputRef.current?.click()}
-                            className="flex items-center gap-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 bg-white dark:bg-indigo-950 px-2 py-1 rounded-md border border-indigo-100 dark:border-indigo-800 shadow-sm"
-                        >
-                            <Plus className="w-3 h-3" />
-                            Add Room
-                        </button>
-                        <input
-                            type="file"
-                            ref={backgroundInputRef}
-                            onChange={handleBackgroundUpload}
-                            accept="image/*"
-                            className="hidden"
-                        />
-                    </div>
-
-                    {backgroundImages.length > 0 ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                            {backgroundImages.map((bg) => (
-                                <div key={bg.id} className="relative group bg-white dark:bg-indigo-950 p-2 rounded-lg border border-indigo-200 dark:border-indigo-800 shadow-sm">
-                                    <div className="aspect-video rounded-md overflow-hidden bg-indigo-100 dark:bg-indigo-900 mb-2">
-                                        <img src={bg.url} alt={bg.name} className="w-full h-full object-cover" />
-                                    </div>
-                                    <input
-                                        type="text"
-                                        value={bg.name}
-                                        onChange={(e) => updateBackgroundName(bg.id, e.target.value)}
-                                        className="w-full text-[10px] font-medium text-indigo-700 dark:text-indigo-300 border-none p-0 bg-transparent focus:ring-0 text-center placeholder-indigo-400 dark:placeholder-indigo-600"
-                                        placeholder="Room Name"
-                                    />
-                                    <button
-                                        onClick={() => removeBackground(bg.id)}
-                                        className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
-                                    >
-                                        <X className="w-3 h-3" />
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="text-center py-6 border-2 border-dashed border-indigo-200 dark:border-indigo-800 rounded-lg">
-                            <ImageIcon className="w-8 h-8 text-indigo-200 dark:text-indigo-800 mx-auto mb-2" />
-                            <p className="text-xs text-indigo-400 dark:text-indigo-500">No background references added yet.</p>
-                        </div>
-                    )}
-                </div>
-
                 {/* Advanced Model Settings */}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1147,8 +1055,6 @@ const AIProfileScreen: React.FC = () => {
                                                         "You are ONLY permitted to modify the pose, clothing, facial expression, and eye position.",
                                                         "DO NOT alter the body type (muscularity, bust size, etc.) or facial structure in any way.",
                                                         "If the prompt or description contradicts the reference image, the reference image ALWAYS takes precedence.",
-                                                        "If a background reference image is provided, you MUST use this EXACT background for the image. DO NOT modify the background or add out-of-place objects. The background reference image takes precedence over any background descriptions in the text prompt.",
-                                                        "The character MUST be scaled realistically according to the background. If the character is sitting on a bed or chair in the background, their size must match the furniture. Do NOT make the character oversized. Ensure the character's head, torso, and limbs are proportional to the room's objects (windows, doors, bookshelves). The character should occupy a natural amount of space, typically appearing smaller than major furniture pieces like beds or wardrobes."
                                                     ];
                                                     setImageGenerationInstructions([...imageGenerationInstructions, ...defaults.filter(d => !imageGenerationInstructions.includes(d))]);
                                                 }}
