@@ -1,5 +1,4 @@
 import { initializeApp, getApps, deleteApp, FirebaseApp } from 'firebase/app';
-import { handleFirestoreError, OperationType } from './firestore-errors';
 import {
   getFirestore, doc, setDoc, getDoc, Firestore, serverTimestamp,
 } from 'firebase/firestore';
@@ -105,15 +104,47 @@ export function onAuthStateChange(
 }
 
 // ── Firestore sanitizer: removes undefined values (Firestore rejects them) ────
+// Also converts Date objects, NaN, and Infinity to safe types.
 function sanitize(value: any): any {
   if (value === undefined) return null;
-  if (value === null || typeof value !== 'object') return value;
+  if (value === null) return null;
+  if (typeof value === 'number') {
+    if (!isFinite(value)) return null; // NaN and Infinity are not valid Firestore values
+    return value;
+  }
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value !== 'object') return value;
   if (Array.isArray(value)) return value.map(sanitize);
   return Object.fromEntries(
     Object.entries(value)
       .filter(([, v]) => v !== undefined)
       .map(([k, v]) => [k, sanitize(v)])
   );
+}
+
+// ── Strip large base64 images before sending to Firestore ─────────────────────
+// Reference images (user/AI photos) can be hundreds of KB each. Firestore has a
+// 1 MiB document limit and chokes on very large string values. These images are
+// stored locally and don't need to travel to the cloud in a text backup.
+function stripImages(data: any): any {
+  if (!data || typeof data !== 'object') return data;
+
+  const strip = (obj: any): any => {
+    if (!obj || typeof obj !== 'object') return obj;
+    if (Array.isArray(obj)) return obj.map(strip);
+    const result: any = {};
+    for (const [key, val] of Object.entries(obj)) {
+      // Drop any field named referenceImage (user photo, AI photo)
+      if (key === 'referenceImage') {
+        result[key] = null;
+        continue;
+      }
+      result[key] = strip(val);
+    }
+    return result;
+  };
+
+  return strip(data);
 }
 
 // ── Backup app data to Firestore ──────────────────────────────────────────────
@@ -127,18 +158,14 @@ export async function backupToFirestore(
   const db = getDb(runtime);
   const { gallery, ...rawData } = data;
   const galleryIds = Array.isArray(gallery) ? gallery.map((g: any) => g.id) : [];
-  const safeData = sanitize(rawData);
+  const safeData = sanitize(stripImages(rawData));
 
-  try {
-    await setDoc(doc(db, 'indigo_backups', userId.trim()), {
-      ...safeData,
-      galleryIds,
-      backedUpAt:    serverTimestamp(),
-      backupVersion: 2,
-    });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, `indigo_backups/${userId.trim()}`);
-  }
+  await setDoc(doc(db, 'indigo_backups', userId.trim()), {
+    ...safeData,
+    galleryIds,
+    backedUpAt:    serverTimestamp(),
+    backupVersion: 2,
+  });
 }
 
 // ── Restore app data from Firestore ──────────────────────────────────────────
@@ -149,13 +176,9 @@ export async function restoreFromFirestore(
   if (!userId?.trim()) throw new Error("A User ID is required. Set one in Settings → Cloud Sync.");
 
   const db   = getDb(runtime);
-  try {
-    const snap = await getDoc(doc(db, 'indigo_backups', userId.trim()));
-    if (!snap.exists()) return null;
-    return snap.data();
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, `indigo_backups/${userId.trim()}`);
-  }
+  const snap = await getDoc(doc(db, 'indigo_backups', userId.trim()));
+  if (!snap.exists()) return null;
+  return snap.data();
 }
 
 // ── Upload gallery images to Firebase Storage ─────────────────────────────────
@@ -197,16 +220,12 @@ export async function uploadGalleryToFirebaseStorage(
   }
 
   // Store manifest in Firestore
-  try {
-    await setDoc(doc(db, 'indigo_gallery_manifests', userId.trim()), {
-      uploadedAt:  serverTimestamp(),
-      count:       uploaded,
-      items:       manifest,
-      version:     1,
-    });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, `indigo_gallery_manifests/${userId.trim()}`);
-  }
+  await setDoc(doc(db, 'indigo_gallery_manifests', userId.trim()), {
+    uploadedAt:  serverTimestamp(),
+    count:       uploaded,
+    items:       manifest,
+    version:     1,
+  });
 
   return uploaded;
 }
@@ -220,13 +239,8 @@ export async function restoreGalleryFromFirebaseStorage(
   if (!userId?.trim()) throw new Error("A User ID is required. Set one in Settings → Cloud Sync.");
 
   const db   = getDb(runtime);
-  let snap;
-  try {
-    snap = await getDoc(doc(db, 'indigo_gallery_manifests', userId.trim()));
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, `indigo_gallery_manifests/${userId.trim()}`);
-  }
-  if (!snap!.exists()) throw new Error("No gallery backup found for this user ID. Back up your gallery first.");
+  const snap = await getDoc(doc(db, 'indigo_gallery_manifests', userId.trim()));
+  if (!snap.exists()) throw new Error("No gallery backup found for this user ID. Back up your gallery first.");
 
   const data  = snap.data();
   const items = (data.items as Array<{ id: string; path: string; downloadUrl?: string; prompt?: string; provider?: string }>) || [];
@@ -301,26 +315,17 @@ export async function uploadKnowledgeBaseToFirebaseStorage(
   }
 
   // Merge with existing manifest so incremental uploads don't wipe old files
-  let existing;
-  try {
-    existing = await getDoc(doc(db, 'indigo_kb_manifests', userId.trim()));
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, `indigo_kb_manifests/${userId.trim()}`);
-  }
-  const existingFiles: typeof manifest = existing!.exists()
-    ? (existing!.data().files || []).filter((f: any) => !manifest.find(m => m.name === f.name))
+  const existing = await getDoc(doc(db, 'indigo_kb_manifests', userId.trim()));
+  const existingFiles: typeof manifest = existing.exists()
+    ? (existing.data().files || []).filter((f: any) => !manifest.find(m => m.name === f.name))
     : [];
 
-  try {
-    await setDoc(doc(db, 'indigo_kb_manifests', userId.trim()), {
-      updatedAt: serverTimestamp(),
-      count:     existingFiles.length + uploaded,
-      files:     [...existingFiles, ...manifest],
-      version:   1,
-    });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, `indigo_kb_manifests/${userId.trim()}`);
-  }
+  await setDoc(doc(db, 'indigo_kb_manifests', userId.trim()), {
+    updatedAt: serverTimestamp(),
+    count:     existingFiles.length + uploaded,
+    files:     [...existingFiles, ...manifest],
+    version:   1,
+  });
 
   return uploaded;
 }
@@ -333,16 +338,11 @@ export async function restoreKnowledgeBaseFromFirebaseStorage(
 ): Promise<KnowledgeBaseFile[]> {
   if (!userId?.trim()) throw new Error("A User ID is required. Set one in Settings → Cloud Sync.");
 
-  const db = getDb(runtime);
-  let snap;
-  try {
-    snap = await getDoc(doc(db, 'indigo_kb_manifests', userId.trim()));
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, `indigo_kb_manifests/${userId.trim()}`);
-  }
-  if (!snap!.exists()) throw new Error("No knowledge base backup found for this user ID.");
+  const db   = getDb(runtime);
+  const snap = await getDoc(doc(db, 'indigo_kb_manifests', userId.trim()));
+  if (!snap.exists()) throw new Error("No knowledge base backup found for this user ID.");
 
-  const data  = snap!.data();
+  const data  = snap.data();
   const files = (data.files as Array<{ name: string; path: string }>) || [];
   if (files.length === 0) throw new Error("The knowledge base backup exists but contains no files.");
 
