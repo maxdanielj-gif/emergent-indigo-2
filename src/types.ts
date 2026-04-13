@@ -63,7 +63,6 @@ export interface AIProfile {
   aiCanGenerateImages: boolean;
   imageStyle?: string;
   imageGenerationInstructions?: string[];
-  backgroundImages?: Background[];
   // Legacy Google fields (kept so old exported personas still load correctly)
   aiCanUseWebSearch?: boolean;
   aiCanUseCalendar?: boolean;
@@ -130,20 +129,6 @@ export interface GalleryItem {
   mediaType?: 'image' | 'video';
   url: string;
   prompt?: string;
-  timestamp: number;
-}
-
-export interface BackgroundImage {
-  id: string;
-  name: string;
-  url: string;
-}
-
-export interface Background {
-  id: string;
-  name: string;
-  url: string;
-  category: string;
   timestamp: number;
 }
 
