@@ -24,7 +24,7 @@ export interface AIProfile {
   voicePitch?: number;
   voiceSpeed?: number;
   autoReadMessages?: boolean;
-  voiceGender?: 'male' | 'female' | 'none';
+
   voiceDescription?: string;
   voiceProvider?: 'browser' | 'elevenlabs';
   asyncVoiceId?: string | null;
