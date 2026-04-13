@@ -676,12 +676,7 @@ app.post("/api/chat", async (req, res) => {
           max_tokens: aiProfile.maxTokens ?? 2048,
           system: systemPrompt,
           messages: claudeMessages,
-          // Claude does not allow temperature and top_p to both be set.
-          // If the user has explicitly set topP, use that alone; otherwise use temperature.
-          ...(aiProfile.topP != null
-            ? { top_p: aiProfile.topP }
-            : { temperature: aiProfile.temperature ?? 0.7 }),
-          ...(aiProfile.topK     != null ? { top_k: aiProfile.topK }    : {}),
+          temperature: aiProfile.temperature ?? 0.7,
         })
     );
 
