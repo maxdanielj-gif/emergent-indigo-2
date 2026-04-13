@@ -24,7 +24,7 @@ export interface AIProfile {
   voicePitch?: number;
   voiceSpeed?: number;
   autoReadMessages?: boolean;
-
+  voiceGender?: 'male' | 'female' | 'none';
   voiceDescription?: string;
   voiceProvider?: 'browser' | 'elevenlabs';
   asyncVoiceId?: string | null;
@@ -54,8 +54,6 @@ export interface AIProfile {
   model: string;
   llmProvider?: 'claude' | 'gemini'; // 'gemini' kept for legacy import compatibility
   temperature: number;
-  topK: number;
-  topP: number;
   maxTokens?: number;
   timeAwareness: boolean;
   ambientMode: boolean;
