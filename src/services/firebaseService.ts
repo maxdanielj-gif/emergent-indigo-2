@@ -158,14 +158,40 @@ export async function backupToFirestore(
   const db = getDb(runtime);
   const { gallery, ...rawData } = data;
   const galleryIds = Array.isArray(gallery) ? gallery.map((g: any) => g.id) : [];
-  const safeData = sanitize(stripImages(rawData));
 
-  await setDoc(doc(db, 'indigo_backups', userId.trim()), {
-    ...safeData,
-    galleryIds,
-    backedUpAt:    serverTimestamp(),
-    backupVersion: 2,
-  });
+  // Strip fields that are too large or contain non-serialisable values
+  // (binary attachment content, base64 images) before sending to Firestore.
+  // This applies whether called from the manual backup button or real-time sync.
+  const prepareProfile = (profile: any) => {
+    if (!profile || typeof profile !== 'object') return profile;
+    return {
+      ...profile,
+      chatHistory:     undefined, // may contain binary image attachments
+      sessions:        undefined, // large array, backed up via manual export
+      activeSessionId: undefined,
+    };
+  };
+
+  const prepared = {
+    ...rawData,
+    aiProfile:     prepareProfile(rawData.aiProfile),
+    savedPersonas: Array.isArray(rawData.savedPersonas)
+      ? rawData.savedPersonas.map(prepareProfile)
+      : rawData.savedPersonas,
+  };
+
+  const safeData = sanitize(stripImages(prepared));
+
+  try {
+    await setDoc(doc(db, 'indigo_backups', userId.trim()), {
+      ...safeData,
+      galleryIds,
+      backedUpAt:    serverTimestamp(),
+      backupVersion: 2,
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `indigo_backups/${userId.trim()}`);
+  }
 }
 
 // ── Restore app data from Firestore ──────────────────────────────────────────
