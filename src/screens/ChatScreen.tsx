@@ -280,29 +280,54 @@ const ChatScreen: React.FC = () => {
     }
   };
 
-  const speakWithBrowser = (text: string, messageId: string) => {
+  const speakWithBrowser = async (text: string, messageId: string) => {
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
-    const voices = window.speechSynthesis.getVoices();
-    
-    if (aiProfile.voiceURI) {
-        const selectedVoice = voices.find(v => v.voiceURI === aiProfile.voiceURI);
-        if (selectedVoice) {
-            utterance.voice = selectedVoice;
+
+    // On Android, getVoices() returns an empty list until the voices have
+    // loaded. We wait for them here so that the saved voice / pitch / rate
+    // settings are actually applied instead of being silently ignored.
+    const getVoicesReady = (): Promise<SpeechSynthesisVoice[]> => {
+      return new Promise((resolve) => {
+        const immediate = window.speechSynthesis.getVoices();
+        if (immediate.length > 0) {
+          resolve(immediate);
+          return;
         }
+        const onChanged = () => {
+          resolve(window.speechSynthesis.getVoices());
+        };
+        window.speechSynthesis.addEventListener('voiceschanged', onChanged, { once: true });
+        // Safety net: if the event never fires, proceed after 1 s with
+        // whatever is available (may be empty, which is fine — browser will
+        // use its default voice).
+        setTimeout(() => {
+          window.speechSynthesis.removeEventListener('voiceschanged', onChanged);
+          resolve(window.speechSynthesis.getVoices());
+        }, 1000);
+      });
+    };
+
+    const voices = await getVoicesReady();
+
+    if (aiProfile.voiceURI) {
+      const selectedVoice = voices.find(v => v.voiceURI === aiProfile.voiceURI);
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+      }
     } else {
-        // Fallback to English
-        utterance.voice = voices.find(v => v.lang.includes('en')) || null;
+      // Fallback to English
+      utterance.voice = voices.find(v => v.lang.includes('en')) || null;
     }
-    
+
     utterance.pitch = aiProfile.voicePitch || 1.0;
     utterance.rate = aiProfile.voiceSpeed || 1.0;
 
     utterance.onend = () => {
-        setReadMessages(prev => new Set(prev).add(messageId));
-        if (isHandsFree) {
-            setTimeout(() => toggleListening(true), 500);
-        }
+      setReadMessages(prev => new Set(prev).add(messageId));
+      if (isHandsFree) {
+        setTimeout(() => toggleListening(true), 500);
+      }
     };
 
     window.speechSynthesis.speak(utterance);
