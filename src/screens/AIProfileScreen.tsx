@@ -47,7 +47,7 @@ const AIProfileScreen: React.FC = () => {
   const [voicePitch, setVoicePitch] = useState(aiProfile.voicePitch || 1.0);
   const [voiceSpeed, setVoiceSpeed] = useState(aiProfile.voiceSpeed || 1.0);
   const [autoReadMessages, setAutoReadMessages] = useState(aiProfile.autoReadMessages || false);
-
+  const [voiceGender, setVoiceGender] = useState<'male' | 'female' | 'none'>(aiProfile.voiceGender || 'none');
   const [voiceDescription, setVoiceDescription] = useState(aiProfile.voiceDescription || '');
   const [voiceProvider, setVoiceProvider] = useState<'browser' | 'elevenlabs'>(
     (aiProfile.voiceProvider === 'elevenlabs') ? 'elevenlabs' : 'browser'
@@ -99,8 +99,6 @@ const AIProfileScreen: React.FC = () => {
 
   const [model, setModel] = useState(validateModel(aiProfile.model));
   const [temperature, setTemperature] = useState(aiProfile.temperature || 0.7);
-  const [topK, setTopK] = useState(aiProfile.topK || 40);
-  const [topP, setTopP] = useState(aiProfile.topP || 0.95);
   const [timeAwareness, setTimeAwareness] = useState<boolean>(aiProfile.timeAwareness ?? true);
   const [ambientModeState, setAmbientModeState] = useState<boolean>(aiProfile.ambientMode ?? false);
   const [ambientFrequencyState, setAmbientFrequencyState] = useState<AIProfile['ambientFrequency']>(aiProfile.ambientFrequency || 'off');
@@ -154,6 +152,10 @@ const AIProfileScreen: React.FC = () => {
     if (voiceURI) {
         selectedVoice = availableVoices.find(v => v.voiceURI === voiceURI);
     }
+    if (!selectedVoice && voiceGender !== 'none') {
+        const genderFilter = voiceGender === 'male' ? 'male' : 'female';
+        selectedVoice = availableVoices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes(genderFilter));
+    }
     if (selectedVoice) utterance.voice = selectedVoice;
 
     utterance.pitch = voicePitch;
@@ -177,7 +179,7 @@ const AIProfileScreen: React.FC = () => {
     setVoicePitch(aiProfile.voicePitch || 1.0);
     setVoiceSpeed(aiProfile.voiceSpeed || 1.0);
     setAutoReadMessages(aiProfile.autoReadMessages || false);
-
+    setVoiceGender(aiProfile.voiceGender || 'none');
     setVoiceDescription(aiProfile.voiceDescription || '');
     setVoiceProvider((aiProfile.voiceProvider === 'elevenlabs') ? 'elevenlabs' : 'browser');
     setResponseLength(aiProfile.responseLength || 'medium');
@@ -213,8 +215,6 @@ const AIProfileScreen: React.FC = () => {
     setReferenceImage(aiProfile.referenceImage);
     setModel(validateModel(aiProfile.model));
     setTemperature(aiProfile.temperature || 0.7);
-    setTopK(aiProfile.topK || 40);
-    setTopP(aiProfile.topP || 0.95);
     setTimeAwareness(aiProfile.timeAwareness !== undefined ? aiProfile.timeAwareness : true);
     setAmbientModeState(aiProfile.ambientMode ?? false);
     setAmbientFrequencyState(aiProfile.ambientFrequency || 'off');
@@ -252,6 +252,7 @@ const AIProfileScreen: React.FC = () => {
       voicePitch,
       voiceSpeed,
       autoReadMessages,
+      voiceGender,
       voiceDescription,
       voiceProvider,
       responseLength,
@@ -270,8 +271,6 @@ const AIProfileScreen: React.FC = () => {
       knowsItsAI,
       model,
       temperature,
-      topK,
-      topP,
       maxTokens,
       timeAwareness,
       ambientMode: ambientModeState,
@@ -323,6 +322,7 @@ const AIProfileScreen: React.FC = () => {
       voicePitch,
       voiceSpeed,
       autoReadMessages,
+      voiceGender,
       voiceDescription,
       voiceProvider,
       responseLength,
@@ -341,8 +341,6 @@ const AIProfileScreen: React.FC = () => {
       knowsItsAI,
       model: aiProfile.model,
       temperature: aiProfile.temperature,
-      topK: aiProfile.topK,
-      topP: aiProfile.topP,
       timeAwareness,
       ambientMode: ambientModeState,
       ambientFrequency: ambientFrequencyState,
@@ -392,6 +390,7 @@ const AIProfileScreen: React.FC = () => {
         voicePitch: 1.0,
         voiceSpeed: 1.0,
         autoReadMessages: false,
+        voiceGender: 'none',
         voiceDescription: '',
         voiceProvider: 'browser',
         responseLength: 'medium',
@@ -405,8 +404,6 @@ const AIProfileScreen: React.FC = () => {
         knowsItsAI: true,
         model: 'claude-sonnet-4-6',
         temperature: 0.7,
-        topK: 40,
-        topP: 0.95,
         timeAwareness: true,
         ambientMode: false,
         ambientFrequency: 'off',
@@ -443,7 +440,7 @@ const AIProfileScreen: React.FC = () => {
         const previewProfile = {
           ...aiProfile,
           name, personality, backstory, appearance, responseLength,
-          customParagraphCount, model, temperature, topP,
+          customParagraphCount, model, temperature,
           knowsItsAI,
         };
         const res = await fetch('/api/chat', {
@@ -469,7 +466,7 @@ const AIProfileScreen: React.FC = () => {
     } finally {
         setIsPreviewLoading(false);
     }
-  }, [previewInput, isPreviewLoading, anthropicApiKey, name, personality, backstory, appearance, responseLength, customParagraphCount, model, temperature, topP, previewMessages, knowsItsAI, aiProfile]);
+  }, [previewInput, isPreviewLoading, anthropicApiKey, name, personality, backstory, appearance, responseLength, customParagraphCount, model, temperature, previewMessages, knowsItsAI, aiProfile]);
 
   const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -525,6 +522,7 @@ const AIProfileScreen: React.FC = () => {
         voicePitch,
         voiceSpeed,
         autoReadMessages,
+        voiceGender,
         voiceDescription,
         voiceProvider,
         responseLength,
@@ -536,9 +534,7 @@ const AIProfileScreen: React.FC = () => {
         knowsItsAI,
         model,
         temperature,
-        topK,
-        topP,
-        timeAwareness,
+            timeAwareness,
         ambientMode: ambientModeState,
         ambientFrequency: ambientFrequencyState,
         aiCanGenerateImages: aiProfile.aiCanGenerateImages,
@@ -1132,46 +1128,6 @@ const AIProfileScreen: React.FC = () => {
                                 </div>
                             </div>
                             <div>
-                                <div className="flex items-center mb-1">
-                                    <label className="block text-xs font-medium text-indigo-700 dark:text-indigo-300">Top K: {topK}</label>
-                                    <div className="relative group ml-1" tabIndex={0}>
-                                        <HelpCircle className="w-3 h-3 text-indigo-400 dark:text-indigo-500 cursor-help" />
-                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-indigo-800 dark:bg-indigo-700 text-white text-[10px] rounded shadow-lg opacity-0 group-hover:opacity-100 focus:opacity-100 group-focus:opacity-100 transition-opacity pointer-events-none z-50">
-                                            Limits the model's vocabulary choices to the top K most likely words at each step. Lower values reduce the chance of nonsensical words.
-                                        </div>
-                                    </div>
-                                </div>
-                                <input
-                                    type="range"
-                                    min="1"
-                                    max="100"
-                                    step="1"
-                                    value={topK}
-                                    onChange={(e) => setTopK(parseInt(e.target.value))}
-                                    className="w-full h-2 bg-indigo-200 dark:bg-indigo-800 rounded-lg appearance-none cursor-pointer accent-indigo-600 mt-1"
-                                />
-                            </div>
-                            <div>
-                                <div className="flex items-center mb-1">
-                                    <label className="block text-xs font-medium text-indigo-700 dark:text-indigo-300">Top P: {topP}</label>
-                                    <div className="relative group ml-1" tabIndex={0}>
-                                        <HelpCircle className="w-3 h-3 text-indigo-400 dark:text-indigo-500 cursor-help" />
-                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-indigo-800 dark:bg-indigo-700 text-white text-[10px] rounded shadow-lg opacity-0 group-hover:opacity-100 focus:opacity-100 group-focus:opacity-100 transition-opacity pointer-events-none z-50">
-                                            Selects words based on cumulative probability. A value of 0.9 means the model only considers the most likely words that make up 90% of the probability mass.
-                                        </div>
-                                    </div>
-                                </div>
-                                <input
-                                    type="range"
-                                    min="0"
-                                    max="1"
-                                    step="0.05"
-                                    value={topP}
-                                    onChange={(e) => setTopP(parseFloat(e.target.value))}
-                                    className="w-full h-2 bg-indigo-200 dark:bg-indigo-800 rounded-lg appearance-none cursor-pointer accent-indigo-600 mt-1"
-                                />
-                            </div>
-                            <div>
                                 <label className="block text-xs font-medium text-indigo-700 dark:text-indigo-300 mb-1">Max Tokens: {maxTokens}</label>
                                 <input
                                     type="range"
@@ -1438,7 +1394,7 @@ const AIProfileScreen: React.FC = () => {
                                 </div>
                             ) : (
                                 <div className="p-4 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 rounded-lg space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                                    <div className="grid grid-cols-1 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-sm font-medium text-indigo-700 dark:text-indigo-300 mb-1">Browser Voice</label>
                                             <div className="flex space-x-2">
@@ -1463,6 +1419,18 @@ const AIProfileScreen: React.FC = () => {
                                                     <Play className="w-5 h-5" />
                                                 </button>
                                             </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-indigo-700 dark:text-indigo-300 mb-1">Voice Gender (Local Only)</label>
+                                            <select
+                                            value={voiceGender}
+                                            onChange={(e) => setVoiceGender(e.target.value as 'male' | 'female' | 'none')}
+                                            className="w-full p-2 border border-indigo-300 dark:border-indigo-700 rounded-md bg-white dark:bg-indigo-950 text-indigo-900 dark:text-indigo-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                            >
+                                            <option value="none">None / Neutral</option>
+                                            <option value="male">Male</option>
+                                            <option value="female">Female</option>
+                                            </select>
                                         </div>
                                     </div>
                                 </div>
