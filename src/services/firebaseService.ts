@@ -105,7 +105,9 @@ export function onAuthStateChange(
 
 // ── Firestore sanitizer: removes undefined values (Firestore rejects them) ────
 // Also converts Date objects, NaN, and Infinity to safe types.
-function sanitize(value: any): any {
+// Firestore does not allow arrays directly inside other arrays — any such value
+// is serialised to a JSON string so the data is preserved without breaking the write.
+function sanitize(value: any, insideArray = false): any {
   if (value === undefined) return null;
   if (value === null) return null;
   if (typeof value === 'number') {
@@ -114,11 +116,17 @@ function sanitize(value: any): any {
   }
   if (value instanceof Date) return value.toISOString();
   if (typeof value !== 'object') return value;
-  if (Array.isArray(value)) return value.map(sanitize);
+  if (Array.isArray(value)) {
+    if (insideArray) {
+      // Firestore forbids arrays-within-arrays. Serialise to JSON string instead.
+      return JSON.stringify(value);
+    }
+    return value.map(item => sanitize(item, true));
+  }
   return Object.fromEntries(
     Object.entries(value)
       .filter(([, v]) => v !== undefined)
-      .map(([k, v]) => [k, sanitize(v)])
+      .map(([k, v]) => [k, sanitize(v, false)])
   );
 }
 
@@ -169,6 +177,11 @@ export async function backupToFirestore(
       chatHistory:     undefined, // may contain binary image attachments
       sessions:        undefined, // large array, backed up via manual export
       activeSessionId: undefined,
+      // Strip per-persona memories and journal — these can contain deeply nested
+      // data that causes Firestore "invalid nested entity" errors. The top-level
+      // memories / journal fields cover the active profile's data.
+      memories:        undefined,
+      journal:         undefined,
     };
   };
 
