@@ -4,7 +4,7 @@ import { saveToDB, loadFromDB, deleteFromDB, clearDB } from '../services/db';
 import { onForegroundMessage, requestNotificationPermission } from '../services/webPushService';
 import { showNativeNotification } from '../services/notificationService';
 import { backupToFirestore, restoreFromFirestore, uploadGalleryToFirebaseStorage, restoreGalleryFromFirebaseStorage, uploadKnowledgeBaseToFirebaseStorage, restoreKnowledgeBaseFromFirebaseStorage, signInWithGoogle as fbSignInWithGoogle, signOutUser as fbSignOutUser, onAuthStateChange, FirebaseUser } from '../services/firebaseService';
-import { AIProfile, UserProfile, ChatMessage, GalleryItem, JournalEntry, Memory, KnowledgeBaseDocument, ChatSession, Background, ProactiveCommunication } from '../types';
+import { AIProfile, UserProfile, ChatMessage, GalleryItem, JournalEntry, Memory, KnowledgeBaseDocument, ChatSession, ProactiveCommunication } from '../types';
 
 export interface Toast {
   id: string;
@@ -41,7 +41,6 @@ interface AppState {
   aiCanGenerateImages: boolean;
   isDebuggerEnabled: boolean;
   timeZone: string;
-  backgrounds: Background[];
   firebaseApiKey: string | null;
   firebaseAuthDomain: string | null;
   firebaseProjectId: string | null;
@@ -122,8 +121,6 @@ interface AppContextType extends AppState {
   setIsDebuggerEnabled: (enabled: boolean) => void;
   setTimeZone: (tz: string) => void;
   updateAIProfile: (updates: Partial<AIProfile>) => void;
-  addBackground: (background: Background) => void;
-  deleteBackground: (id: string) => void;
   fetchWithRetry: (url: string, options: RequestInit, retries?: number, backoff?: number) => Promise<Response>;
   firebaseBackup: (data: any) => Promise<void>;
   firebaseRestore: () => Promise<any | null>;
@@ -212,10 +209,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       "You are ONLY permitted to modify the pose, clothing, facial expression, and eye position.",
       "DO NOT alter the body type (muscularity, bust size, etc.) or facial structure in any way.",
       "If the prompt or description contradicts the reference image, the reference image ALWAYS takes precedence.",
-      "If a background reference image is provided, you MUST use this EXACT background for the image. DO NOT modify the background or add out-of-place objects. The background reference image takes precedence over any background descriptions in the text prompt.",
-      "The character MUST be scaled realistically according to the background. If the character is sitting on a bed or chair in the background, their size must match the furniture. Do NOT make the character oversized. Ensure the character's head, torso, and limbs are proportional to the room's objects (windows, doors, bookshelves). The character should occupy a natural amount of space, typically appearing smaller than major furniture pieces like beds or wardrobes."
     ],
-    backgroundImages: [],
     aiCanGenerateSpeech: false,
     aiCanUseTools: false,
     aiCanUseWebSearch: false,
@@ -298,7 +292,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const [showTimestamps, setShowTimestampsState] = useState(true);
   const [timeZone, setTimeZoneState] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
-  const [backgrounds, setBackgrounds] = useState<Background[]>([]);
   const [firebaseApiKey,           setFirebaseApiKey]           = useState<string | null>(null);
   const [firebaseAuthDomain,       setFirebaseAuthDomain]       = useState<string | null>(null);
   const [firebaseProjectId,        setFirebaseProjectId]        = useState<string | null>(null);
@@ -367,10 +360,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       "You are ONLY permitted to modify the pose, clothing, facial expression, and eye position.",
       "DO NOT alter the body type (muscularity, bust size, etc.) or facial structure in any way.",
       "If the prompt or description contradicts the reference image, the reference image ALWAYS takes precedence.",
-      "If a background reference image is provided, you MUST use this EXACT background for the image. DO NOT modify the background or add out-of-place objects. The background reference image takes precedence over any background descriptions in the text prompt.",
-      "The character MUST be scaled realistically according to the background. If the character is sitting on a bed or chair in the background, their size must match the furniture. Do NOT make the character oversized. Ensure the character's head, torso, and limbs are proportional to the room's objects (windows, doors, bookshelves). The character should occupy a natural amount of space, typically appearing smaller than major furniture pieces like beds or wardrobes."
     ],
-    backgroundImages: [],
     aiCanGenerateSpeech: false,
     aiCanUseTools: false,
     aiCanUseWebSearch: false,
@@ -448,7 +438,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                     console.log("Core data found, loading parts...", Date.now());
                     const activeProfileStr = await loadFromDB('indigo_app_data_active_profile');
                     const galleryDataStr = await loadFromDB('indigo_app_data_gallery');
-                    const backgroundsDataStr = await loadFromDB('indigo_app_data_backgrounds');
                     
                     const activeProfile = activeProfileStr ? (typeof activeProfileStr === 'string' ? JSON.parse(activeProfileStr) : activeProfileStr) : null;
                     
@@ -456,8 +445,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                     let galleryData: GalleryItem[] = [];
                     
                     console.log("Skipping gallery load in loadData", Date.now());
-
-                    const backgroundsData = backgroundsDataStr ? (typeof backgroundsDataStr === 'string' ? JSON.parse(backgroundsDataStr) : backgroundsDataStr) : [];
 
                     const personaIds = await loadFromDB('indigo_app_data_persona_ids') || [];
                     console.log("Loading personas...", Date.now());
@@ -474,7 +461,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                         ...coreData,
                         aiProfile: activeProfile || coreData.aiProfile,
                         gallery: galleryData || [],
-                        backgrounds: backgroundsData || [],
                         savedPersonas: personasData.length > 0 ? personasData : (coreData.savedPersonas || [])
                     };
                     console.log("Chunked data loaded successfully", Date.now());
@@ -546,7 +532,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                     aiCanSendProactiveEmails: loadedProfile?.aiCanSendProactiveEmails ?? false,
                     imageStyle: loadedProfile?.imageStyle || 'none',
                     imageGenerationInstructions: loadedProfile?.imageGenerationInstructions !== undefined ? loadedProfile.imageGenerationInstructions : initialAIProfileState.imageGenerationInstructions,
-                    backgroundImages: loadedProfile?.backgroundImages || [],
                 }));
 
                 const loadedSavedPersonas = (Array.isArray(savedData.savedPersonas) ? savedData.savedPersonas : [loadedProfile]).map((p: any) => ({
@@ -592,7 +577,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 setSyncFrequency(savedData.syncFrequency !== undefined ? savedData.syncFrequency : 5);
                 setNotificationsEnabledState(savedData.notificationsEnabled !== undefined ? savedData.notificationsEnabled : (typeof Notification !== 'undefined' && Notification.permission === 'granted'));
                 setTimeZoneState(savedData.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone);
-                setBackgrounds(Array.isArray(savedData.backgrounds) ? savedData.backgrounds : []);
                 if (savedData.lastInteractionTime) {
                   setLastInteractionTime(savedData.lastInteractionTime);
                 }
@@ -651,7 +635,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ambientFrequency: aiProfile.ambientFrequency,
           aiCanGenerateImages: aiProfile.aiCanGenerateImages,
           timeZone,
-          backgrounds,
           firebaseApiKey,
           firebaseAuthDomain,
           firebaseProjectId,
@@ -678,15 +661,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const coreData = { ...data };
           delete coreData.savedPersonas;
           delete coreData.gallery;
-          delete coreData.backgrounds;
           delete coreData.aiProfile;
 
           await saveToDB('indigo_app_data_core', coreData);
           await saveToDB('indigo_app_data_active_profile', JSON.stringify(aiProfile));
           // Gallery is saved separately in its own useEffect (see below saveData)
           // to avoid hook ordering issues and stale closure problems.
-
-          await saveToDB('indigo_app_data_backgrounds', JSON.stringify(backgrounds));
 
           const personaIds = savedPersonas.map(p => p.id);
           await saveToDB('indigo_app_data_persona_ids', personaIds);
@@ -1320,21 +1300,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const galleryChunk = filteredGallery.slice(i, i + chunkSize);
       const data = {
         gallery: galleryChunk,
-        // Only include backgrounds in the first chunk to avoid redundancy
-        backgrounds: i === 0 ? backgrounds : [],
-        aiProfileBackgrounds: i === 0 ? aiProfile.backgroundImages : []
-      };
-      const jsonString = JSON.stringify(data);
-      const uint8 = strToU8(jsonString);
-      chunks.push(gzipSync(uint8, { level: 9 }));
-    }
-    
-    // If gallery is empty but there are backgrounds, still create one chunk (only for 'all' or 'image' maybe?)
-    if (filteredGallery.length === 0 && (!mediaType || mediaType === 'image') && (backgrounds.length > 0 || aiProfile.backgroundImages?.length)) {
-      const data = {
-        gallery: [],
-        backgrounds,
-        aiProfileBackgrounds: aiProfile.backgroundImages
       };
       const jsonString = JSON.stringify(data);
       const uint8 = strToU8(jsonString);
@@ -1347,8 +1312,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const importGalleryChunks = async (chunks: Uint8Array[]) => {
     try {
       let combinedGallery: any[] = [];
-      let combinedBackgrounds: any[] = [];
-      let combinedAIProfileBackgrounds: any[] = [];
       
       for (const chunk of chunks) {
         const decompressed = gunzipSync(chunk);
@@ -1356,8 +1319,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const parsed = JSON.parse(jsonString);
         
         if (parsed.gallery) combinedGallery = [...combinedGallery, ...parsed.gallery];
-        if (parsed.backgrounds) combinedBackgrounds = [...combinedBackgrounds, ...parsed.backgrounds];
-        if (parsed.aiProfileBackgrounds) combinedAIProfileBackgrounds = [...combinedAIProfileBackgrounds, ...parsed.aiProfileBackgrounds];
       }
       
       // Use a Map to deduplicate by ID
@@ -1368,13 +1329,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
       
       setGallery(prev => deduplicate([...prev, ...combinedGallery]));
-      setBackgrounds(prev => deduplicate([...prev, ...combinedBackgrounds]));
-      if (combinedAIProfileBackgrounds.length > 0) {
-        setAIProfileState(prev => ({ 
-          ...prev, 
-          backgroundImages: deduplicate([...(prev.backgroundImages || []), ...combinedAIProfileBackgrounds]) 
-        }));
-      }
       
       addToast({ title: "Gallery Restored", message: `Restored ${combinedGallery.length} images from ${chunks.length} chunks.`, type: "success" });
     } catch (e) {
@@ -1498,13 +1452,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           [...prev, ...data.gallery].forEach(item => map.set(item.id, item));
           return Array.from(map.values());
         });
-        if (data.backgrounds) {
-          setBackgrounds(prev => {
-            const map = new Map();
-            [...prev, ...data.backgrounds].forEach(item => map.set(item.id, item));
-            return Array.from(map.values());
-          });
-        }
         addToast({ title: "Gallery Restored", message: `Restored ${data.gallery.length} images from cloud sync.`, type: "success" });
       } else if (!mediaType && data.galleryBackup) {
         const base64 = data.galleryBackup;
@@ -1568,8 +1515,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setNotificationsEnabledState(parsed.notificationsEnabled !== undefined ? parsed.notificationsEnabled : (typeof Notification !== 'undefined' && Notification.permission === 'granted'));
       setShowTimestampsState(parsed.showTimestamps !== undefined ? parsed.showTimestamps : true);
       setTimeZoneState(parsed.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone);
-      setBackgrounds(parsed.backgrounds || []);
-      
       addToast({ title: "Import Successful", message: "All app data has been restored.", type: "success" });
     } catch (e) {
       console.error("Invalid JSON data", e);
@@ -1680,13 +1625,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const setAmbientFrequency = (frequency: '1h' | '6h' | '12h' | '24h' | 'off') => setAIProfileState(prev => ({ ...prev, ambientFrequency: frequency }));
   const setAiCanGenerateImages = (enabled: boolean) => setAIProfileState(prev => ({ ...prev, aiCanGenerateImages: enabled }));
   const setTimeZone = (tz: string) => setTimeZoneState(tz);
-  const addBackground = (background: Background) => {
-    setBackgrounds(prev => [background, ...prev]);
-  };
-
-  const deleteBackground = (id: string) => {
-    setBackgrounds(prev => prev.filter(b => b.id !== id));
-  };
 
   const resetApp = async () => {
       try {
@@ -1746,7 +1684,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ambientFrequency: aiProfile.ambientFrequency, setAmbientFrequency,
       aiCanGenerateImages: aiProfile.aiCanGenerateImages, setAiCanGenerateImages,
       timeZone, setTimeZone,
-      backgrounds, addBackground, deleteBackground,
       firebaseApiKey, firebaseAuthDomain, firebaseProjectId, firebaseStorageBucket,
       firebaseAppId, firebaseMessagingSenderId, setFirebaseConfig,
       lastCloudSyncTime, lastFirebaseBackupTime, lastGalleryBackupTime,
