@@ -159,24 +159,23 @@ export async function backupToFirestore(
   const { gallery, ...rawData } = data;
   const galleryIds = Array.isArray(gallery) ? gallery.map((g: any) => g.id) : [];
 
-  // Strip fields that Firestore cannot handle (binary attachments, base64 images)
-  // from profile objects before serialising.
+  // Strip fields that Firestore cannot handle (binary attachments, base64 images,
+  // and large content like knowledgeBase which has its own Storage upload flow).
   const prepareProfile = (profile: any) => {
     if (!profile || typeof profile !== 'object') return profile;
     const { chatHistory, sessions, activeSessionId, referenceImage, ...rest } = profile;
     return rest;
   };
 
-  const preparedAiProfile  = prepareProfile(rawData.aiProfile);
-  const preparedPersonas   = Array.isArray(rawData.savedPersonas)
+  const preparedAiProfile = prepareProfile(rawData.aiProfile);
+  const preparedPersonas  = Array.isArray(rawData.savedPersonas)
     ? rawData.savedPersonas.map(prepareProfile)
     : [];
 
-  // Firestore rejects arrays that contain — directly or inside nested objects —
-  // other arrays ("Property array contains an invalid nested entity"). Rather than
-  // trying to walk the entire object graph, we serialise every complex field to a
-  // JSON string. Firestore only ever sees simple strings/numbers/booleans, so the
-  // error cannot occur. The restore function parses them back.
+  // Firestore rejects nested arrays ("Property array contains an invalid nested
+  // entity") and has a hard 1 MB document limit. We sidestep both by serialising
+  // every complex / potentially large field to a JSON string — Firestore only ever
+  // sees scalars. The restore function parses them back.
   const safeString = (val: any): string => {
     try {
       return JSON.stringify(stripImages({ value: val }).value ?? val) ?? 'null';
@@ -186,13 +185,14 @@ export async function backupToFirestore(
   };
 
   await setDoc(doc(db, 'indigo_backups', userId.trim()), {
-    // Complex objects → JSON strings
+    // Complex objects → JSON strings (avoids nested-array errors)
     aiProfile:     safeString(preparedAiProfile),
     savedPersonas: safeString(preparedPersonas),
     userProfile:   safeString(rawData.userProfile),
     journal:       safeString(rawData.journal),
     memories:      safeString(rawData.memories),
-    knowledgeBase: safeString(rawData.knowledgeBase),
+    // knowledgeBase is intentionally excluded — it can be very large and has its
+    // own dedicated Firebase Storage upload/restore flow (Settings → Cloud Sync).
     // Simple scalar values — store directly
     apiKey:              rawData.apiKey              ?? null,
     anthropicApiKey:     rawData.anthropicApiKey     ?? null,
@@ -235,7 +235,9 @@ export async function restoreFromFirestore(
       userProfile:   parse(raw.userProfile,   {}),
       journal:       parse(raw.journal,       []),
       memories:      parse(raw.memories,      []),
-      knowledgeBase: parse(raw.knowledgeBase, []),
+      // knowledgeBase is not stored in this document — restore it separately
+      // via Settings → Cloud Sync → Restore Knowledge Base.
+      knowledgeBase: [],
     };
   }
 
