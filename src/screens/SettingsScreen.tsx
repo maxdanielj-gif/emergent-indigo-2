@@ -27,6 +27,8 @@ const SettingsScreen: React.FC = () => {
     updateAIProfile,
     isDebuggerEnabled, setIsDebuggerEnabled,
     firebaseBackup, firebaseRestore, firebaseGalleryBackup, firebaseGalleryRestore,
+    firebaseKBBackup, firebaseKBRestore,
+    wavespeedApiKey, setWavespeedApiKey,
     firebaseApiKey, firebaseAuthDomain, firebaseProjectId,
     firebaseStorageBucket, firebaseMessagingSenderId, firebaseAppId,
     setFirebaseConfig,
@@ -47,6 +49,7 @@ const SettingsScreen: React.FC = () => {
   const [localAnthropicApiKey,    setLocalAnthropicApiKey]    = useState(anthropicApiKey || '');
   const [localElevenLabsApiKey,   setLocalElevenLabsApiKey]   = useState(elevenLabsApiKey || '');
   const [localGeminiApiKey,       setLocalGeminiApiKey]       = useState(geminiApiKey || '');
+  const [localWavespeedApiKey,    setLocalWavespeedApiKey]    = useState(wavespeedApiKey || '');
   const [isFirebaseBackingUp,  setIsFirebaseBackingUp]  = useState(false);
   const [isFirebaseRestoring,  setIsFirebaseRestoring]  = useState(false);
   const [isGalleryBackingUp,   setIsGalleryBackingUp]   = useState(false);
@@ -86,6 +89,7 @@ const SettingsScreen: React.FC = () => {
   React.useEffect(() => { setLocalAnthropicApiKey(anthropicApiKey || ''); }, [anthropicApiKey]);
   React.useEffect(() => { setLocalElevenLabsApiKey(elevenLabsApiKey || ''); }, [elevenLabsApiKey]);
   React.useEffect(() => { setLocalGeminiApiKey(geminiApiKey || ''); }, [geminiApiKey]);
+  React.useEffect(() => { setLocalWavespeedApiKey(wavespeedApiKey || ''); }, [wavespeedApiKey]);
   const [localSyncId,          setLocalSyncId]          = useState(userId || '');
   const [isExporting,          setIsExporting]          = useState(false);
   const [isImporting,          setIsImporting]          = useState(false);
@@ -140,6 +144,11 @@ const SettingsScreen: React.FC = () => {
   const handleSaveGeminiKey = () => {
     setGeminiApiKey(localGeminiApiKey.trim() || null);
     addToast({ title: 'Saved', message: 'Gemini API key saved.', type: 'success' });
+  };
+
+  const handleSaveWavespeedKey = () => {
+    setWavespeedApiKey(localWavespeedApiKey.trim() || null);
+    addToast({ title: 'Saved', message: 'WaveSpeed API key saved.', type: 'success' });
   };
 
   const handleSaveFirebaseConfig = () => {
@@ -548,6 +557,29 @@ const SettingsScreen: React.FC = () => {
               </div>
               <p className="text-xs text-indigo-500 dark:text-indigo-400 mt-1">
                 Get a key at <a href="https://aistudio.google.com" target="_blank" rel="noreferrer" className="underline">aistudio.google.com</a>. Enables Gemini models in AI Profile settings, and auto-fallback if Claude is unavailable.
+              </p>
+            </div>
+
+            {/* WaveSpeed */}
+            <div>
+              <label className="block text-sm font-medium text-indigo-700 dark:text-indigo-300 mb-1">
+                WaveSpeed API Key <span className="text-indigo-400 dark:text-indigo-500 font-normal">(required for image generation)</span>
+              </label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-400" />
+                  <input
+                    type="password"
+                    value={localWavespeedApiKey}
+                    onChange={(e) => setLocalWavespeedApiKey(e.target.value)}
+                    placeholder="Your WaveSpeed API key"
+                    className="app-input pl-9"
+                  />
+                </div>
+                <button onClick={handleSaveWavespeedKey} className="app-btn-primary">Save</button>
+              </div>
+              <p className="text-xs text-indigo-500 dark:text-indigo-400 mt-1">
+                Get a key at <a href="https://wavespeed.ai" target="_blank" rel="noreferrer" className="underline">wavespeed.ai</a>. Required for the Image Generator.
               </p>
             </div>
 
