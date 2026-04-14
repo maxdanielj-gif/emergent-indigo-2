@@ -103,30 +103,38 @@ export function onAuthStateChange(
   return onAuthStateChanged(auth, callback);
 }
 
-// ── Firestore sanitizer: removes undefined values (Firestore rejects them) ────
-// Also converts Date objects, NaN, and Infinity to safe types.
-// Firestore does not allow arrays directly inside other arrays — any such value
-// is serialised to a JSON string so the data is preserved without breaking the write.
-function sanitize(value: any, insideArray = false): any {
+// ── Firestore sanitizer ────────────────────────────────────────────────────────
+// - Removes undefined values (Firestore rejects them)
+// - Converts Date, NaN, Infinity to safe types
+// - Converts any array nested inside another array (directly or through object
+//   properties) to a JSON string. Firestore does not reliably handle arrays of
+//   objects whose properties are themselves arrays, and throws
+//   "Property array contains an invalid nested entity" when it encounters them.
+function sanitize(value: any, arrayDepth = 0): any {
   if (value === undefined) return null;
   if (value === null) return null;
   if (typeof value === 'number') {
-    if (!isFinite(value)) return null; // NaN and Infinity are not valid Firestore values
+    if (!isFinite(value)) return null;
     return value;
   }
   if (value instanceof Date) return value.toISOString();
   if (typeof value !== 'object') return value;
   if (Array.isArray(value)) {
-    if (insideArray) {
-      // Firestore forbids arrays-within-arrays. Serialise to JSON string instead.
+    if (arrayDepth > 0) {
+      // We are already inside an array somewhere up the call stack.
+      // Serialise this inner array to a JSON string to satisfy Firestore.
       return JSON.stringify(value);
     }
-    return value.map(item => sanitize(item, true));
+    // Top-level array: recurse with depth incremented so any nested arrays
+    // encountered inside elements (or their object properties) get stringified.
+    return value.map(item => sanitize(item, arrayDepth + 1));
   }
+  // For plain objects, propagate the current arrayDepth so that array-valued
+  // properties of an object that is itself inside an array are also caught.
   return Object.fromEntries(
     Object.entries(value)
       .filter(([, v]) => v !== undefined)
-      .map(([k, v]) => [k, sanitize(v, false)])
+      .map(([k, v]) => [k, sanitize(v, arrayDepth)])
   );
 }
 
@@ -177,11 +185,15 @@ export async function backupToFirestore(
       chatHistory:     undefined, // may contain binary image attachments
       sessions:        undefined, // large array, backed up via manual export
       activeSessionId: undefined,
-      // Strip per-persona memories and journal — these can contain deeply nested
-      // data that causes Firestore "invalid nested entity" errors. The top-level
-      // memories / journal fields cover the active profile's data.
-      memories:        undefined,
-      journal:         undefined,
+      // Strip array-valued fields from personas inside savedPersonas.
+      // These are arrays-inside-objects-inside-the-savedPersonas-array, which
+      // can trigger Firestore's "invalid nested entity" error depending on their
+      // content. Memories and journal belong to the active profile and are
+      // backed up at the top level; imageGenerationInstructions can be restored
+      // from the active profile on import.
+      memories:                   undefined,
+      journal:                    undefined,
+      imageGenerationInstructions: undefined,
     };
   };
 
