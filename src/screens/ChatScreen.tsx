@@ -272,7 +272,8 @@ const ChatScreen: React.FC = () => {
         audio.onended = () => { onEnd(); URL.revokeObjectURL(url); };
         audio.onerror = () => { URL.revokeObjectURL(url); speakWithBrowser(text, messageId); };
         audio.play();
-      } catch {
+      } catch (e: any) {
+        addToast({ title: 'ElevenLabs TTS failed', message: e.message || 'Falling back to browser voice.', type: 'error' });
         speakWithBrowser(text, messageId);
       }
     } else {

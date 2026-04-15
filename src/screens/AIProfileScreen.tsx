@@ -47,7 +47,6 @@ const AIProfileScreen: React.FC = () => {
   const [voicePitch, setVoicePitch] = useState(aiProfile.voicePitch || 1.0);
   const [voiceSpeed, setVoiceSpeed] = useState(aiProfile.voiceSpeed || 1.0);
   const [autoReadMessages, setAutoReadMessages] = useState(aiProfile.autoReadMessages || false);
-  const [voiceGender, setVoiceGender] = useState<'male' | 'female' | 'none'>(aiProfile.voiceGender || 'none');
   const [voiceDescription, setVoiceDescription] = useState(aiProfile.voiceDescription || '');
   const [voiceProvider, setVoiceProvider] = useState<'browser' | 'elevenlabs'>(
     (aiProfile.voiceProvider === 'elevenlabs') ? 'elevenlabs' : 'browser'
@@ -152,10 +151,6 @@ const AIProfileScreen: React.FC = () => {
     if (voiceURI) {
         selectedVoice = availableVoices.find(v => v.voiceURI === voiceURI);
     }
-    if (!selectedVoice && voiceGender !== 'none') {
-        const genderFilter = voiceGender === 'male' ? 'male' : 'female';
-        selectedVoice = availableVoices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes(genderFilter));
-    }
     if (selectedVoice) utterance.voice = selectedVoice;
 
     utterance.pitch = voicePitch;
@@ -179,7 +174,6 @@ const AIProfileScreen: React.FC = () => {
     setVoicePitch(aiProfile.voicePitch || 1.0);
     setVoiceSpeed(aiProfile.voiceSpeed || 1.0);
     setAutoReadMessages(aiProfile.autoReadMessages || false);
-    setVoiceGender(aiProfile.voiceGender || 'none');
     setVoiceDescription(aiProfile.voiceDescription || '');
     setVoiceProvider((aiProfile.voiceProvider === 'elevenlabs') ? 'elevenlabs' : 'browser');
     setResponseLength(aiProfile.responseLength || 'medium');
@@ -252,7 +246,6 @@ const AIProfileScreen: React.FC = () => {
       voicePitch,
       voiceSpeed,
       autoReadMessages,
-      voiceGender,
       voiceDescription,
       voiceProvider,
       responseLength,
@@ -322,7 +315,6 @@ const AIProfileScreen: React.FC = () => {
       voicePitch,
       voiceSpeed,
       autoReadMessages,
-      voiceGender,
       voiceDescription,
       voiceProvider,
       responseLength,
@@ -390,7 +382,6 @@ const AIProfileScreen: React.FC = () => {
         voicePitch: 1.0,
         voiceSpeed: 1.0,
         autoReadMessages: false,
-        voiceGender: 'none',
         voiceDescription: '',
         voiceProvider: 'browser',
         responseLength: 'medium',
@@ -522,7 +513,6 @@ const AIProfileScreen: React.FC = () => {
         voicePitch,
         voiceSpeed,
         autoReadMessages,
-        voiceGender,
         voiceDescription,
         voiceProvider,
         responseLength,
@@ -603,6 +593,10 @@ const AIProfileScreen: React.FC = () => {
   const [elVoiceTypeFilter, setElVoiceTypeFilter] = useState('');
   const [elSort, setElSort] = useState<'name' | 'created_at_unix'>('name');
   const [elSortDir, setElSortDir] = useState<'asc' | 'desc'>('asc');
+  const [elLangFilter, setElLangFilter] = useState('');
+  const [elAccentFilter, setElAccentFilter] = useState('');
+  const [elGenderFilter, setElGenderFilter] = useState('');
+  const [elAgeFilter, setElAgeFilter] = useState('');
   const [dynamicEmotion, setDynamicEmotion]     = useState<boolean>(aiProfile.dynamicEmotion  ?? false);
 
   // ElevenLabs voice quality settings
@@ -619,13 +613,18 @@ const AIProfileScreen: React.FC = () => {
     if (!elevenLabsApiKey) return;
     setIsLoadingElevenLabsVoices(true);
     try {
-      const voices = await listElevenLabsVoices(elevenLabsApiKey, {
+      let voices = await listElevenLabsVoices(elevenLabsApiKey, {
         search: elSearchFilter || undefined,
         sort: elSort,
         sort_direction: elSortDir,
         voice_type: elVoiceTypeFilter as any || undefined,
         category: elCategoryFilter as any || undefined,
       });
+      // Apply label filters client-side — ElevenLabs v1 returns labels as a free-form object
+      if (elLangFilter)   voices = voices.filter((v: any) => v.labels?.language?.toLowerCase().includes(elLangFilter.toLowerCase()));
+      if (elAccentFilter) voices = voices.filter((v: any) => v.labels?.accent?.toLowerCase().includes(elAccentFilter.toLowerCase()));
+      if (elGenderFilter) voices = voices.filter((v: any) => v.labels?.gender?.toLowerCase() === elGenderFilter.toLowerCase());
+      if (elAgeFilter)    voices = voices.filter((v: any) => v.labels?.age?.toLowerCase().includes(elAgeFilter.toLowerCase()));
       setElevenLabsVoices(voices);
     } catch (error: any) {
       addToast({ title: "ElevenLabs Error", message: error.message || "Failed to load voices.", type: "error" });
@@ -633,14 +632,14 @@ const AIProfileScreen: React.FC = () => {
       setIsLoadingElevenLabsVoices(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [elevenLabsApiKey, elSearchFilter, elCategoryFilter, elVoiceTypeFilter, elSort, elSortDir]);
+  }, [elevenLabsApiKey, elSearchFilter, elCategoryFilter, elVoiceTypeFilter, elSort, elSortDir, elLangFilter, elAccentFilter, elGenderFilter, elAgeFilter]);
 
   useEffect(() => {
     if (voiceProvider === 'elevenlabs' && elevenLabsApiKey) {
       fetchElevenLabsVoices();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [voiceProvider, elevenLabsApiKey, elSearchFilter, elCategoryFilter, elVoiceTypeFilter, elSort, elSortDir]);
+  }, [voiceProvider, elevenLabsApiKey, elSearchFilter, elCategoryFilter, elVoiceTypeFilter, elSort, elSortDir, elLangFilter, elAccentFilter, elGenderFilter, elAgeFilter]);
 
   return (
     <div className="flex flex-col lg:flex-row h-full w-full mx-auto bg-transparent transition-colors duration-500 overflow-y-auto lg:overflow-hidden p-4 sm:p-6 gap-4 sm:gap-6">
@@ -848,7 +847,7 @@ const AIProfileScreen: React.FC = () => {
 
                 {/* Advanced Model Settings */}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                     <div>
                         <label className="block text-sm font-medium text-indigo-700 dark:text-indigo-300 mb-1">Response Detail</label>
                         <select
@@ -880,7 +879,7 @@ const AIProfileScreen: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                     <div>
                         <label className="block text-sm font-medium text-indigo-700 dark:text-indigo-300 mb-1">Custom Paragraph Count</label>
                         <input
@@ -907,7 +906,7 @@ const AIProfileScreen: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                     <div>
                         <label className="block text-sm font-medium text-indigo-700 dark:text-indigo-300 mb-1">Response Length</label>
                         <select
@@ -1268,6 +1267,42 @@ const AIProfileScreen: React.FC = () => {
                                             <option value="community">Community</option>
                                             <option value="default">Default</option>
                                         </select>
+                                        {/* Label filters — populated from ElevenLabs voice metadata */}
+                                        <select className="text-xs p-1 rounded border border-indigo-200 dark:border-indigo-700 bg-white dark:bg-indigo-950 text-indigo-900 dark:text-indigo-100" value={elGenderFilter} onChange={(e) => setElGenderFilter(e.target.value)}>
+                                            <option value="">Any gender</option>
+                                            <option value="male">Male</option>
+                                            <option value="female">Female</option>
+                                        </select>
+                                        <select className="text-xs p-1 rounded border border-indigo-200 dark:border-indigo-700 bg-white dark:bg-indigo-950 text-indigo-900 dark:text-indigo-100" value={elAgeFilter} onChange={(e) => setElAgeFilter(e.target.value)}>
+                                            <option value="">Any age</option>
+                                            <option value="young">Young</option>
+                                            <option value="middle">Middle aged</option>
+                                            <option value="old">Old</option>
+                                        </select>
+                                        <select className="text-xs p-1 rounded border border-indigo-200 dark:border-indigo-700 bg-white dark:bg-indigo-950 text-indigo-900 dark:text-indigo-100" value={elAccentFilter} onChange={(e) => setElAccentFilter(e.target.value)}>
+                                            <option value="">Any accent</option>
+                                            <option value="american">American</option>
+                                            <option value="british">British</option>
+                                            <option value="australian">Australian</option>
+                                            <option value="irish">Irish</option>
+                                            <option value="canadian">Canadian</option>
+                                            <option value="indian">Indian</option>
+                                            <option value="african">African</option>
+                                        </select>
+                                        <select className="text-xs p-1 rounded border border-indigo-200 dark:border-indigo-700 bg-white dark:bg-indigo-950 text-indigo-900 dark:text-indigo-100" value={elLangFilter} onChange={(e) => setElLangFilter(e.target.value)}>
+                                            <option value="">Any language</option>
+                                            <option value="english">English</option>
+                                            <option value="spanish">Spanish</option>
+                                            <option value="french">French</option>
+                                            <option value="german">German</option>
+                                            <option value="portuguese">Portuguese</option>
+                                            <option value="italian">Italian</option>
+                                            <option value="japanese">Japanese</option>
+                                            <option value="chinese">Chinese</option>
+                                            <option value="korean">Korean</option>
+                                            <option value="arabic">Arabic</option>
+                                            <option value="hindi">Hindi</option>
+                                        </select>
                                         <select className="text-xs p-1 rounded border border-indigo-200 dark:border-indigo-700 bg-white dark:bg-indigo-950 text-indigo-900 dark:text-indigo-100" value={elSort} onChange={(e) => setElSort(e.target.value as any)}>
                                             <option value="name">Sort: Name</option>
                                             <option value="created_at_unix">Sort: Date</option>
@@ -1297,7 +1332,7 @@ const AIProfileScreen: React.FC = () => {
                                                     <div className="flex-1 min-w-0">
                                                         <span className="text-sm font-bold text-indigo-900 dark:text-indigo-100 truncate block">{v.name}</span>
                                                         <span className="text-[10px] text-indigo-400 dark:text-indigo-500">
-                                                            {[v.category, v.labels?.accent, v.labels?.gender].filter(Boolean).join(' · ')}
+                                                            {[v.labels?.language, v.labels?.gender, v.labels?.age, v.labels?.accent].filter(Boolean).join(' · ')}
                                                         </span>
                                                     </div>
                                                     <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ml-2 ${elevenLabsVoiceId === v.voice_id ? 'border-indigo-600 bg-indigo-600' : 'border-indigo-300 dark:border-indigo-700'}`}>
@@ -1394,7 +1429,7 @@ const AIProfileScreen: React.FC = () => {
                                 </div>
                             ) : (
                                 <div className="p-4 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 rounded-lg space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 gap-4">
                                         <div>
                                             <label className="block text-sm font-medium text-indigo-700 dark:text-indigo-300 mb-1">Browser Voice</label>
                                             <div className="flex space-x-2">
@@ -1419,18 +1454,6 @@ const AIProfileScreen: React.FC = () => {
                                                     <Play className="w-5 h-5" />
                                                 </button>
                                             </div>
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-indigo-700 dark:text-indigo-300 mb-1">Voice Gender (Local Only)</label>
-                                            <select
-                                            value={voiceGender}
-                                            onChange={(e) => setVoiceGender(e.target.value as 'male' | 'female' | 'none')}
-                                            className="w-full p-2 border border-indigo-300 dark:border-indigo-700 rounded-md bg-white dark:bg-indigo-950 text-indigo-900 dark:text-indigo-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                            >
-                                            <option value="none">None / Neutral</option>
-                                            <option value="male">Male</option>
-                                            <option value="female">Female</option>
-                                            </select>
                                         </div>
                                     </div>
                                 </div>
