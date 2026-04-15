@@ -73,7 +73,6 @@ interface AppContextType extends AppState {
   addToGallery: (item: GalleryItem) => void;
   deleteImageFromGallery: (id: string) => void;
   deleteImagesFromGallery: (ids: string[]) => void;
-  updateGalleryItem: (id: string, updates: Partial<import('./types').GalleryItem>) => void;
   addJournalEntry: (entry: JournalEntry) => void;
   updateJournalEntry: (id: string, updates: Partial<JournalEntry>) => void;
   deleteJournalEntry: (id: string) => void;
@@ -1037,18 +1036,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
   
   const addToGallery = React.useCallback((item: GalleryItem) => {
-    const stamped = { ...item, personaId: item.personaId ?? aiProfile.id };
-    setGallery(prev => [stamped, ...prev]);
+    setGallery(prev => [item, ...prev]);
     saveData();
     // Immediately upload to Firebase Storage when real-time sync is active
     if (realTimeSyncEnabled && userId?.trim() && firebaseApiKey && firebaseProjectId && firebaseAppId && firebaseStorageBucket) {
       const rtConfig = { apiKey: firebaseApiKey, projectId: firebaseProjectId, appId: firebaseAppId, storageBucket: firebaseStorageBucket };
-      uploadGalleryToFirebaseStorage(userId, [stamped], rtConfig).catch(e => {
+      uploadGalleryToFirebaseStorage(userId, [item], rtConfig).catch(e => {
         console.error('Real-time gallery upload failed:', e);
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [saveData, aiProfile.id, realTimeSyncEnabled, userId, firebaseApiKey, firebaseProjectId, firebaseAppId, firebaseStorageBucket]);
+  }, [saveData, realTimeSyncEnabled, userId, firebaseApiKey, firebaseProjectId, firebaseAppId, firebaseStorageBucket]);
 
   const deleteImageFromGallery = (id: string) => {
     setGallery(prev => prev.filter(item => item.id !== id));
@@ -1057,11 +1055,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteImagesFromGallery = (ids: string[]) => {
     setGallery(prev => prev.filter(item => !ids.includes(item.id)));
-    saveData();
-  };
-
-  const updateGalleryItem = (id: string, updates: Partial<GalleryItem>) => {
-    setGallery(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
     saveData();
   };
 
@@ -1216,7 +1209,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const firebaseGalleryBackup = async (onProgress?: (done: number, total: number) => void): Promise<number> => {
     if (!userId) throw new Error("Set a User ID in Cloud Sync settings before backing up the gallery.");
-    return uploadGalleryToFirebaseStorage(userId, gallery, firebaseRuntimeConfig, onProgress);
+
+    // Gallery is lazily loaded — only reads from disk when the Gallery screen is visited.
+    // If the user triggers backup from Settings without having opened the Gallery screen,
+    // the in-memory `gallery` array will be empty. In that case we read directly from
+    // IndexedDB so we have the real data, rather than waiting for React state to settle.
+    let galleryToBackup = gallery;
+    if (!galleryLoaded) {
+      const galleryIds = await loadFromDB('indigo_app_data_gallery_ids');
+      if (galleryIds && Array.isArray(galleryIds)) {
+        const items = await Promise.all(
+          galleryIds.map(async (id: string) => {
+            const itemStr = await loadFromDB(`indigo_app_data_gallery_item_${id}`);
+            return itemStr ? (typeof itemStr === 'string' ? JSON.parse(itemStr) : itemStr) : null;
+          })
+        );
+        galleryToBackup = items.filter((item): item is GalleryItem => item !== null);
+      } else {
+        galleryToBackup = [];
+      }
+    }
+
+    return uploadGalleryToFirebaseStorage(userId, galleryToBackup, firebaseRuntimeConfig, onProgress);
   };
 
   const firebaseGalleryRestore = async (onProgress?: (done: number, total: number) => void): Promise<number> => {
@@ -1666,7 +1680,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       aiProfile, setAIProfile, savePersona, deletePersona, loadPersona,
       savedPersonas, galleryLoaded, loadGallery,
       userProfile, setUserProfile, setUserReferenceImage,
-      gallery, addToGallery, deleteImageFromGallery, deleteImagesFromGallery, updateGalleryItem,
+      gallery, addToGallery, deleteImageFromGallery, deleteImagesFromGallery,
       journal, addJournalEntry, updateJournalEntry, deleteJournalEntry,
       knowledgeBase, addToKnowledgeBase, addMultipleToKnowledgeBase, deleteFromKnowledgeBase, deleteMultipleFromKnowledgeBase,
       memories, addMemory, updateMemory, deleteMemory,
