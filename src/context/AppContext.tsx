@@ -73,6 +73,7 @@ interface AppContextType extends AppState {
   addToGallery: (item: GalleryItem) => void;
   deleteImageFromGallery: (id: string) => void;
   deleteImagesFromGallery: (ids: string[]) => void;
+  updateGalleryItem: (id: string, updates: Partial<import('./types').GalleryItem>) => void;
   addJournalEntry: (entry: JournalEntry) => void;
   updateJournalEntry: (id: string, updates: Partial<JournalEntry>) => void;
   deleteJournalEntry: (id: string) => void;
@@ -196,6 +197,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     proactiveBlogId: null,
     model: 'gemini-2.0-flash',
     temperature: 0.7,
+    topK: 40,
+    topP: 0.95,
     timeAwareness: true,
     ambientMode: false,
     ambientFrequency: 'off',
@@ -345,6 +348,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     llmProvider: 'gemini',
     model: 'gemini-2.0-flash',
     temperature: 0.7,
+    topK: 40,
+    topP: 0.95,
     timeAwareness: true,
     ambientMode: false,
     ambientFrequency: 'off',
@@ -1032,17 +1037,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
   
   const addToGallery = React.useCallback((item: GalleryItem) => {
-    setGallery(prev => [item, ...prev]);
+    const stamped = { ...item, personaId: item.personaId ?? aiProfile.id };
+    setGallery(prev => [stamped, ...prev]);
     saveData();
     // Immediately upload to Firebase Storage when real-time sync is active
     if (realTimeSyncEnabled && userId?.trim() && firebaseApiKey && firebaseProjectId && firebaseAppId && firebaseStorageBucket) {
       const rtConfig = { apiKey: firebaseApiKey, projectId: firebaseProjectId, appId: firebaseAppId, storageBucket: firebaseStorageBucket };
-      uploadGalleryToFirebaseStorage(userId, [item], rtConfig).catch(e => {
+      uploadGalleryToFirebaseStorage(userId, [stamped], rtConfig).catch(e => {
         console.error('Real-time gallery upload failed:', e);
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [saveData, realTimeSyncEnabled, userId, firebaseApiKey, firebaseProjectId, firebaseAppId, firebaseStorageBucket]);
+  }, [saveData, aiProfile.id, realTimeSyncEnabled, userId, firebaseApiKey, firebaseProjectId, firebaseAppId, firebaseStorageBucket]);
 
   const deleteImageFromGallery = (id: string) => {
     setGallery(prev => prev.filter(item => item.id !== id));
@@ -1051,6 +1057,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteImagesFromGallery = (ids: string[]) => {
     setGallery(prev => prev.filter(item => !ids.includes(item.id)));
+    saveData();
+  };
+
+  const updateGalleryItem = (id: string, updates: Partial<GalleryItem>) => {
+    setGallery(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
     saveData();
   };
 
@@ -1655,7 +1666,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       aiProfile, setAIProfile, savePersona, deletePersona, loadPersona,
       savedPersonas, galleryLoaded, loadGallery,
       userProfile, setUserProfile, setUserReferenceImage,
-      gallery, addToGallery, deleteImageFromGallery, deleteImagesFromGallery,
+      gallery, addToGallery, deleteImageFromGallery, deleteImagesFromGallery, updateGalleryItem,
       journal, addJournalEntry, updateJournalEntry, deleteJournalEntry,
       knowledgeBase, addToKnowledgeBase, addMultipleToKnowledgeBase, deleteFromKnowledgeBase, deleteMultipleFromKnowledgeBase,
       memories, addMemory, updateMemory, deleteMemory,
