@@ -70,7 +70,7 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, imageUrl, medi
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.9, opacity: 0 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="relative max-w-5xl w-full max-h-full flex flex-col items-center"
+          className="relative max-w-5xl w-full max-h-[95vh] flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
           <button
@@ -79,8 +79,10 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, imageUrl, medi
           >
             <X className="w-8 h-8" />
           </button>
-          
-          <div className="relative group w-full flex flex-col items-center">
+
+          {/* Scrollable content area */}
+          <div className="overflow-y-auto overscroll-contain flex flex-col items-center">
+            <div className="relative group w-full flex flex-col items-center">
             {isConverting ? (
               <div className="w-full aspect-video flex flex-col items-center justify-center bg-indigo-100 dark:bg-indigo-900 rounded-lg">
                 <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
@@ -92,13 +94,13 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, imageUrl, medi
                 controls
                 autoPlay
                 playsInline
-                className="max-w-full max-h-[80vh] rounded-lg shadow-2xl"
+                className="max-w-full max-h-[60vh] rounded-lg shadow-2xl"
               />
             ) : (
               <img
                 src={imageUrl}
                 alt="Full view"
-                className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl"
+                className="max-w-full max-h-[60vh] object-contain rounded-lg shadow-2xl"
               />
             )}
             
@@ -128,13 +130,14 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, imageUrl, medi
             </div>
 
             {prompt && (
-              <div className="mt-6 p-4 bg-indigo-100/50 dark:bg-indigo-900/50 backdrop-blur-md rounded-xl border border-indigo-200 dark:border-indigo-800 max-w-2xl w-full">
+              <div className="mt-6 mb-4 p-4 bg-indigo-100/50 dark:bg-indigo-900/50 backdrop-blur-md rounded-xl border border-indigo-200 dark:border-indigo-800 max-w-2xl w-full max-h-48 overflow-y-auto">
                 <h4 className="text-xs font-bold text-indigo-900/60 dark:text-indigo-100/60 uppercase tracking-wider mb-2">Prompt</h4>
                 <p className="text-sm text-indigo-900 dark:text-indigo-100 leading-relaxed italic">
                   "{prompt}"
                 </p>
               </div>
             )}
+          </div>
           </div>
         </motion.div>
       </motion.div>
