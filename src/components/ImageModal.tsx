@@ -75,7 +75,7 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, imageUrl, medi
         >
           <button
             onClick={onClose}
-            className="absolute -top-12 right-0 md:-top-4 md:-right-12 p-2 text-white hover:text-gray-300 transition-colors bg-white/10 rounded-full backdrop-blur-md"
+            className="absolute top-3 right-3 z-10 p-1 text-white/80 hover:text-white transition-colors"
           >
             <X className="w-8 h-8" />
           </button>
