@@ -74,29 +74,29 @@ const GalleryItemCard: React.FC<{
                 )}
             </div>
 
-            <div className="flex items-center justify-center space-x-4 p-3 bg-gray-50 dark:bg-indigo-950 border-t border-gray-200 dark:border-indigo-700">
+            <div className="flex items-center justify-center gap-1 px-2 py-2 bg-gray-50 dark:bg-indigo-950 border-t border-gray-200 dark:border-indigo-700">
                 <a
                     href={item.url}
                     download={`${activeTab}-${item.id}.png`}
-                    className="p-3 bg-white dark:bg-indigo-900 text-gray-800 dark:text-indigo-100 rounded-full hover:bg-gray-100 dark:hover:bg-indigo-800 transition-colors shadow-sm min-h-[44px] min-w-[44px] flex items-center justify-center"
+                    className="p-2 text-gray-500 dark:text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-200 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
                     title="Download"
                 >
-                    <Download className="w-6 h-6" />
+                    <Download className="w-5 h-5" />
                 </a>
                 <button
                     onClick={() => handleDelete(item.id)}
-                    className="p-3 bg-white dark:bg-indigo-900 text-red-500 rounded-full hover:bg-red-100 dark:hover:bg-red-900 transition-colors shadow-sm min-h-[44px] min-w-[44px] flex items-center justify-center"
+                    className="p-2 text-red-400 hover:text-red-600 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
                     title="Delete Image"
                 >
-                    <Trash2 className="w-6 h-6" />
+                    <Trash2 className="w-5 h-5" />
                 </button>
                 {item.prompt && (
                     <button
                         onClick={() => handleCopyPrompt(item.prompt!)}
-                        className="p-3 bg-white dark:bg-indigo-900 text-gray-800 dark:text-indigo-100 rounded-full hover:bg-gray-100 dark:hover:bg-indigo-800 transition-colors shadow-sm min-h-[44px] min-w-[44px] flex items-center justify-center"
+                        className="p-2 text-gray-500 dark:text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-200 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
                         title="Copy Prompt"
                     >
-                        <Copy className="w-6 h-6" />
+                        <Copy className="w-5 h-5" />
                     </button>
                 )}
             </div>
