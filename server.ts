@@ -677,6 +677,8 @@ app.post("/api/chat", async (req, res) => {
           system: systemPrompt,
           messages: claudeMessages,
           temperature: aiProfile.temperature ?? 0.7,
+          ...(aiProfile.topP     != null ? { top_p: aiProfile.topP }    : {}),
+          ...(aiProfile.topK     != null ? { top_k: aiProfile.topK }    : {}),
         })
     );
 
@@ -740,6 +742,7 @@ app.post("/api/wavespeed/generate", express.json({ limit: "20mb" }), async (req,
       seed: seed !== undefined && seed !== null && seed !== '' ? parseInt(seed, 10) : -1,
       enable_sync_mode: false,
       enable_base64_output: false,
+      enable_safety_checker: false,
     };
 
     // Size (width x height) — optional, defaults to input image size
