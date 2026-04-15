@@ -54,6 +54,8 @@ export interface AIProfile {
   model: string;
   llmProvider?: 'claude' | 'gemini'; // 'gemini' kept for legacy import compatibility
   temperature: number;
+  topK: number;
+  topP: number;
   maxTokens?: number;
   timeAwareness: boolean;
   ambientMode: boolean;
@@ -128,6 +130,7 @@ export interface GalleryItem {
   url: string;
   prompt?: string;
   timestamp: number;
+  personaId?: string; // which persona this image belongs to (undefined = unassigned)
 }
 
 export interface ProactiveCommunication {
