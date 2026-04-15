@@ -73,6 +73,7 @@ interface AppContextType extends AppState {
   addToGallery: (item: GalleryItem) => void;
   deleteImageFromGallery: (id: string) => void;
   deleteImagesFromGallery: (ids: string[]) => void;
+  updateGalleryItem: (id: string, updates: Partial<GalleryItem>) => void;
   addJournalEntry: (entry: JournalEntry) => void;
   updateJournalEntry: (id: string, updates: Partial<JournalEntry>) => void;
   deleteJournalEntry: (id: string) => void;
@@ -126,6 +127,8 @@ interface AppContextType extends AppState {
   firebaseRestore: () => Promise<any | null>;
   firebaseGalleryBackup: (onProgress?: (done: number, total: number) => void) => Promise<number>;
   firebaseGalleryRestore: (onProgress?: (done: number, total: number) => void) => Promise<number>;
+  firebaseKBBackup: (onProgress?: (done: number, total: number) => void) => Promise<number>;
+  firebaseKBRestore: (onProgress?: (done: number, total: number) => void) => Promise<number>;
   realTimeSyncEnabled: boolean;
   setRealTimeSyncEnabled: (enabled: boolean) => void;
   autoBackupSchedule: 'off' | 'daily' | 'weekly';
@@ -179,7 +182,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     voicePitch: 1.0,
     voiceSpeed: 1.0,
     autoReadMessages: false,
-    voiceGender: 'none',
     voiceProvider: 'browser',
     responseLength: 'medium',
     responseDetail: 'medium',
@@ -196,8 +198,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     proactiveBlogId: null,
     model: 'gemini-2.0-flash',
     temperature: 0.7,
-    topK: 40,
-    topP: 0.95,
     timeAwareness: true,
     ambientMode: false,
     ambientFrequency: 'off',
@@ -333,7 +333,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     voicePitch: 1.0,
     voiceSpeed: 1.0,
     autoReadMessages: false,
-    voiceGender: 'none',
     voiceProvider: 'browser',
     responseLength: 'medium',
     responseDetail: 'medium',
@@ -347,8 +346,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     llmProvider: 'gemini',
     model: 'gemini-2.0-flash',
     temperature: 0.7,
-    topK: 40,
-    topP: 0.95,
     timeAwareness: true,
     ambientMode: false,
     ambientFrequency: 'off',
@@ -1036,17 +1033,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
   
   const addToGallery = React.useCallback((item: GalleryItem) => {
-    setGallery(prev => [item, ...prev]);
+    const stamped = { ...item, personaId: item.personaId ?? aiProfile.id };
+    setGallery(prev => [stamped, ...prev]);
     saveData();
     // Immediately upload to Firebase Storage when real-time sync is active
     if (realTimeSyncEnabled && userId?.trim() && firebaseApiKey && firebaseProjectId && firebaseAppId && firebaseStorageBucket) {
       const rtConfig = { apiKey: firebaseApiKey, projectId: firebaseProjectId, appId: firebaseAppId, storageBucket: firebaseStorageBucket };
-      uploadGalleryToFirebaseStorage(userId, [item], rtConfig).catch(e => {
+      uploadGalleryToFirebaseStorage(userId, [stamped], rtConfig).catch(e => {
         console.error('Real-time gallery upload failed:', e);
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [saveData, realTimeSyncEnabled, userId, firebaseApiKey, firebaseProjectId, firebaseAppId, firebaseStorageBucket]);
+  }, [saveData, aiProfile.id, realTimeSyncEnabled, userId, firebaseApiKey, firebaseProjectId, firebaseAppId, firebaseStorageBucket]);
 
   const deleteImageFromGallery = (id: string) => {
     setGallery(prev => prev.filter(item => item.id !== id));
@@ -1055,6 +1053,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteImagesFromGallery = (ids: string[]) => {
     setGallery(prev => prev.filter(item => !ids.includes(item.id)));
+    saveData();
+  };
+
+  const updateGalleryItem = (id: string, updates: Partial<GalleryItem>) => {
+    setGallery(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
     saveData();
   };
 
@@ -1209,11 +1212,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const firebaseGalleryBackup = async (onProgress?: (done: number, total: number) => void): Promise<number> => {
     if (!userId) throw new Error("Set a User ID in Cloud Sync settings before backing up the gallery.");
-
-    // Gallery is lazily loaded — only reads from disk when the Gallery screen is visited.
-    // If the user triggers backup from Settings without having opened the Gallery screen,
-    // the in-memory `gallery` array will be empty. In that case we read directly from
-    // IndexedDB so we have the real data, rather than waiting for React state to settle.
+    // Gallery is lazily loaded — only populated when the Gallery screen is visited.
+    // If backup is triggered from Settings before that, read directly from IndexedDB.
     let galleryToBackup = gallery;
     if (!galleryLoaded) {
       const galleryIds = await loadFromDB('indigo_app_data_gallery_ids');
@@ -1229,7 +1229,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         galleryToBackup = [];
       }
     }
-
     return uploadGalleryToFirebaseStorage(userId, galleryToBackup, firebaseRuntimeConfig, onProgress);
   };
 
@@ -1244,6 +1243,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addToGallery({ id: item.id, url: item.url, prompt: item.prompt || '', provider: item.provider || 'Firebase Storage', createdAt: Date.now() } as any);
         added++;
       }
+    }
+    return added;
+  };
+
+  const firebaseKBBackup = async (onProgress?: (done: number, total: number) => void): Promise<number> => {
+    if (!userId) throw new Error("Set a User ID in Cloud Sync settings before backing up the knowledge base.");
+    return uploadKnowledgeBaseToFirebaseStorage(userId, knowledgeBase, firebaseRuntimeConfig, onProgress);
+  };
+
+  const firebaseKBRestore = async (onProgress?: (done: number, total: number) => void): Promise<number> => {
+    if (!userId) throw new Error("Set a User ID in Cloud Sync settings before restoring the knowledge base.");
+    const restored = await restoreKnowledgeBaseFromFirebaseStorage(userId, firebaseRuntimeConfig, onProgress);
+    let added = 0;
+    for (const file of restored) {
+      addToKnowledgeBase({ name: file.name, content: file.content });
+      added++;
     }
     return added;
   };
@@ -1680,7 +1695,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       aiProfile, setAIProfile, savePersona, deletePersona, loadPersona,
       savedPersonas, galleryLoaded, loadGallery,
       userProfile, setUserProfile, setUserReferenceImage,
-      gallery, addToGallery, deleteImageFromGallery, deleteImagesFromGallery,
+      gallery, addToGallery, deleteImageFromGallery, deleteImagesFromGallery, updateGalleryItem,
       journal, addJournalEntry, updateJournalEntry, deleteJournalEntry,
       knowledgeBase, addToKnowledgeBase, addMultipleToKnowledgeBase, deleteFromKnowledgeBase, deleteMultipleFromKnowledgeBase,
       memories, addMemory, updateMemory, deleteMemory,
@@ -1718,6 +1733,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       exportGalleryData, exportGalleryChunks, importGalleryData, importGalleryChunks, syncGalleryToCloud, restoreGalleryFromCloud,
       updateAIProfile, fetchWithRetry,
       firebaseBackup, firebaseRestore, firebaseGalleryBackup, firebaseGalleryRestore,
+      firebaseKBBackup, firebaseKBRestore,
       autoBackupSchedule, setAutoBackupSchedule,
       realTimeSyncEnabled, setRealTimeSyncEnabled,
       currentUser, authLoading, signInWithGoogle, signOut,
