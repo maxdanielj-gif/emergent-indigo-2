@@ -624,6 +624,47 @@ app.post("/api/chat", async (req, res) => {
   const selectedModel = aiProfile.model || "claude-sonnet-4-6";
   const useGemini = isGeminiModel(selectedModel);
 
+  // ── api.airforce path ────────────────────────────────────────────────────
+  const useAirforce = aiProfile.llmProvider === 'airforce';
+  if (useAirforce) {
+    const airforceKey = req.body.airforceKey || process.env.AIRFORCE_API_KEY;
+    if (!airforceKey) {
+      return res.status(400).json({ error: "api.airforce API key not configured. Add it in Settings." });
+    }
+    try {
+      const airforceMessages = [
+        { role: "system", content: systemPrompt },
+        ...messages.map((m: any) => ({
+          role: m.role === "model" ? "assistant" : "user",
+          content: m.content,
+        })),
+      ];
+      const r = await fetch(`${AIRFORCE_BASE}/v1/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${airforceKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: selectedModel,
+          messages: airforceMessages,
+          max_tokens: aiProfile.maxTokens ?? 2048,
+          temperature: aiProfile.temperature ?? 0.7,
+        }),
+      });
+      if (!r.ok) {
+        const errText = await r.text();
+        throw new Error(`api.airforce error (${r.status}): ${errText}`);
+      }
+      const data = await r.json();
+      const text = data.choices?.[0]?.message?.content || "";
+      return res.json({ content: text, provider: "airforce" });
+    } catch (e: any) {
+      console.error("api.airforce chat error:", e.message);
+      return res.status(500).json({ error: e.message || "api.airforce request failed." });
+    }
+  }
+
   // ── Gemini path ───────────────────────────────────────────────────────────
   if (useGemini) {
     try {
@@ -700,6 +741,45 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
+
+
+// ── Api.Airforce: fetch available text/chat models ────────────────────────────
+const AIRFORCE_BASE = "https://api.airforce";
+
+// Keywords that identify non-text models (image, video, audio) — filter these out
+const AIRFORCE_NON_TEXT_KEYWORDS = [
+  "flux", "sdxl", "dall-e", "dall_e", "imagen", "midjourney", "imagine",
+  "video", "veo", "suno", "audio", "whisper", "kandinsky", "stable-diffusion",
+  "stablediffusion", "rtist", "midijourney", "turbo-image", "art-",
+];
+
+function isAirforceTextModel(id: string): boolean {
+  const lower = id.toLowerCase();
+  return !AIRFORCE_NON_TEXT_KEYWORDS.some(kw => lower.includes(kw));
+}
+
+app.get("/api/airforce/models", async (req, res) => {
+  const apiKey = (req.query.api_key as string) || process.env.AIRFORCE_API_KEY;
+  if (!apiKey) return res.status(400).json({ error: "api.airforce API key required." });
+
+  try {
+    const r = await fetch(`${AIRFORCE_BASE}/v1/models`, {
+      headers: { "Authorization": `Bearer ${apiKey}` },
+    });
+    if (!r.ok) {
+      const errText = await r.text();
+      return res.status(r.status).json({ error: `api.airforce error: ${errText}` });
+    }
+    const data = await r.json();
+    const allModels: string[] = Array.isArray(data.data)
+      ? data.data.map((m: any) => m.id).filter(Boolean)
+      : [];
+    const textModels = allModels.filter(isAirforceTextModel).sort();
+    res.json({ models: textModels });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message || "Failed to fetch models from api.airforce." });
+  }
+});
 
 // ── WaveSpeed AI: image editing ──────────────────────────────────────────────
 // Unified REST API: POST to submit, GET to poll results.
