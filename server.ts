@@ -751,6 +751,9 @@ const AIRFORCE_NON_TEXT_KEYWORDS = [
   "flux", "sdxl", "dall-e", "dall_e", "imagen", "midjourney", "imagine",
   "video", "veo", "suno", "audio", "whisper", "kandinsky", "stable-diffusion",
   "stablediffusion", "rtist", "midijourney", "turbo-image", "art-",
+  "nano-banana", "nano_banana", "nanobana",
+  "paint", "draw", "sketch", "diffusion", "generate-image", "image-gen",
+  "img2img", "text2img", "txt2img", "inpaint",
 ];
 
 function isAirforceTextModel(id: string): boolean {
@@ -958,10 +961,55 @@ Return ONLY a valid JSON object with updated "personality" and/or "backstory" st
 });
 
 // ── Claude AI: journal reflection ─────────────────────────────────────────────
+
+// ── Shared helper: single-turn prompt via the active provider ─────────────────
+// Used by journal and memory endpoints so they use the same model as chat.
+async function callActiveProvider(
+  prompt: string,
+  aiProfile: any,
+  keys: { anthropicKey?: string; geminiKey?: string; airforceKey?: string },
+  maxTokens: number,
+): Promise<string> {
+  const provider = aiProfile.llmProvider || 'claude';
+  const model = aiProfile.model || 'claude-haiku-4-5-20251001';
+
+  // ── api.airforce ─────────────────────────────────────────────────────────
+  if (provider === 'airforce') {
+    const apiKey = keys.airforceKey || process.env.AIRFORCE_API_KEY;
+    if (!apiKey) throw new Error('api.airforce API key not configured.');
+    const r = await fetch(`${AIRFORCE_BASE}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: maxTokens,
+        temperature: 0.7,
+      }),
+    });
+    if (!r.ok) throw new Error(`api.airforce error (${r.status}): ${await r.text()}`);
+    const data = await r.json();
+    return data.choices?.[0]?.message?.content?.trim() || '';
+  }
+
+  // ── Gemini ───────────────────────────────────────────────────────────────
+  if (provider === 'gemini' || isGeminiModel(model)) {
+    return await callGeminiChat('', [{ role: 'user', content: prompt }], model, 0.7, keys.geminiKey);
+  }
+
+  // ── Claude (default) ─────────────────────────────────────────────────────
+  const client = getAnthropicClient(keys.anthropicKey);
+  const response = await client.messages.create({
+    model: 'claude-haiku-4-5-20251001', // always use Haiku for background tasks — fast and cheap
+    max_tokens: maxTokens,
+    messages: [{ role: 'user', content: prompt }],
+  });
+  return response.content[0]?.type === 'text' ? response.content[0].text.trim() : '';
+}
+
 app.post("/api/journal-reflection", async (req, res) => {
-  const { userMsg, aiMsg, aiProfile, userProfile, anthropicKey: clientKey, timeZone } = req.body;
+  const { userMsg, aiMsg, aiProfile, userProfile, anthropicKey, geminiKey, airforceKey, timeZone } = req.body;
   try {
-    const client = getAnthropicClient(clientKey);
     const today = new Date().toLocaleDateString("en-US", { timeZone: timeZone || "UTC" });
     const personaNote = !aiProfile.knowsItsAI ? " Do not call yourself an AI." : "";
 
@@ -972,13 +1020,7 @@ You responded: ${aiMsg}
 
 Journal entry:`;
 
-    const response = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 200,
-      messages: [{ role: "user", content: prompt }],
-    });
-
-    const text = response.content[0]?.type === "text" ? response.content[0].text : "";
+    const text = await callActiveProvider(prompt, aiProfile, { anthropicKey, geminiKey, airforceKey }, 200);
     res.json({ content: text });
   } catch (e: any) {
     console.error("Journal reflection error:", e.message);
@@ -988,9 +1030,8 @@ Journal entry:`;
 
 // ── Claude AI: memory extraction ──────────────────────────────────────────────
 app.post("/api/memory-extract", async (req, res) => {
-  const { userMsg, aiMsg, aiProfile, userProfile, existingMemories, anthropicKey: clientKey } = req.body;
+  const { userMsg, aiMsg, aiProfile, userProfile, existingMemories, anthropicKey, geminiKey, airforceKey } = req.body;
   try {
-    const client = getAnthropicClient(clientKey);
     const personaNote = !aiProfile.knowsItsAI
       ? `You are ${aiProfile.name} — never refer to yourself as an AI, a language model, or a bot.`
       : `You are ${aiProfile.name}.`;
@@ -1007,13 +1048,7 @@ ${(existingMemories || []).map((m: any) => m.content).join("; ")}
 
 If there is a new fact worth remembering, write it as a single concise sentence in the first person from your perspective as ${aiProfile.name} (e.g. "I know that ${userProfile.name} loves hiking" or "${userProfile.name} told me their favourite colour is blue"). Otherwise write exactly NOTHING.`;
 
-    const response = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 100,
-      messages: [{ role: "user", content: prompt }],
-    });
-
-    const text = (response.content[0]?.type === "text" ? response.content[0].text : "").trim();
+    const text = await callActiveProvider(prompt, aiProfile, { anthropicKey, geminiKey, airforceKey }, 100);
     res.json({ memory: !text || text === "NOTHING" || text.includes("NOTHING") ? null : text });
   } catch (e: any) {
     console.error("Memory extract error:", e.message);
