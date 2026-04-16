@@ -30,7 +30,7 @@ const AIProfileScreen: React.FC = () => {
   const {
     aiProfile, setAIProfile, savePersona, deletePersona, savedPersonas, loadPersona,
     setAmbientMode, setAmbientFrequency, addToast,
-    anthropicApiKey, elevenLabsApiKey, geminiApiKey, userId,
+    anthropicApiKey, elevenLabsApiKey, geminiApiKey, airforceApiKey, userId,
   } = useApp();
   const { chatHistory, sessions, activeSessionId, setChatHistory, setSessions, setActiveSessionId } = useChat();
   const [name, setName] = useState(aiProfile.name);
@@ -97,6 +97,12 @@ const AIProfileScreen: React.FC = () => {
   };
 
   const [model, setModel] = useState(validateModel(aiProfile.model));
+  const [llmProvider, setLlmProvider] = useState<'claude' | 'gemini' | 'airforce'>(
+    (aiProfile.llmProvider === 'airforce' ? 'airforce' : aiProfile.llmProvider === 'gemini' ? 'gemini' : 'claude')
+  );
+  const [airforceModels, setAirforceModels] = useState<string[]>([]);
+  const [isFetchingAFModels, setIsFetchingAFModels] = useState(false);
+  const [airforceModelsError, setAirforceModelsError] = useState('');
   const [temperature, setTemperature] = useState(aiProfile.temperature || 0.7);
   const [timeAwareness, setTimeAwareness] = useState<boolean>(aiProfile.timeAwareness ?? true);
   const [ambientModeState, setAmbientModeState] = useState<boolean>(aiProfile.ambientMode ?? false);
@@ -208,6 +214,7 @@ const AIProfileScreen: React.FC = () => {
     setKnowsItsAI(aiProfile.knowsItsAI ?? true);
     setReferenceImage(aiProfile.referenceImage);
     setModel(validateModel(aiProfile.model));
+    setLlmProvider(aiProfile.llmProvider === 'airforce' ? 'airforce' : aiProfile.llmProvider === 'gemini' ? 'gemini' : 'claude');
     setTemperature(aiProfile.temperature || 0.7);
     setTimeAwareness(aiProfile.timeAwareness !== undefined ? aiProfile.timeAwareness : true);
     setAmbientModeState(aiProfile.ambientMode ?? false);
@@ -263,6 +270,7 @@ const AIProfileScreen: React.FC = () => {
       proactiveBlogId,
       knowsItsAI,
       model,
+      llmProvider,
       temperature,
       maxTokens,
       timeAwareness,
@@ -333,6 +341,7 @@ const AIProfileScreen: React.FC = () => {
       proactiveBlogId: proactiveBlogId,
       knowsItsAI,
       model: aiProfile.model,
+      llmProvider,
       temperature: aiProfile.temperature,
       timeAwareness,
       ambientMode: ambientModeState,
@@ -539,6 +548,7 @@ const AIProfileScreen: React.FC = () => {
         proactiveMessageFrequency,
         knowsItsAI,
         model,
+        llmProvider,
         temperature,
             timeAwareness,
         ambientMode: ambientModeState,
@@ -624,6 +634,28 @@ const AIProfileScreen: React.FC = () => {
 
   // LLM max tokens
   const [maxTokens, setMaxTokens] = useState<number>(aiProfile.maxTokens ?? 2048);
+
+  const fetchAirforceModels = async () => {
+    if (!airforceApiKey) {
+      setAirforceModelsError('Add your api.airforce API key in Settings first.');
+      return;
+    }
+    setIsFetchingAFModels(true);
+    setAirforceModelsError('');
+    try {
+      const res = await fetch(`/api/airforce/models?api_key=${encodeURIComponent(airforceApiKey)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to fetch models');
+      setAirforceModels(data.models || []);
+      if ((data.models || []).length > 0 && !data.models.includes(model)) {
+        setModel(data.models[0]);
+      }
+    } catch (e: any) {
+      setAirforceModelsError(e.message || 'Could not load models.');
+    } finally {
+      setIsFetchingAFModels(false);
+    }
+  };
 
   const fetchElevenLabsVoices = useCallback(async () => {
     if (!elevenLabsApiKey) return;
@@ -1098,23 +1130,86 @@ const AIProfileScreen: React.FC = () => {
                                 <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${timeAwareness ? 'translate-x-5' : 'translate-x-0'}`} />
                             </button>
                         </div>
+                        {/* Provider selector */}
                         <div>
-                            <label className="block text-sm font-medium text-indigo-700 dark:text-indigo-300 mb-1">AI Model</label>
+                            <label className="block text-sm font-medium text-indigo-700 dark:text-indigo-300 mb-1">AI Provider</label>
                             <select
-                                value={model}
+                                value={llmProvider}
                                 onChange={(e) => {
-                                  setModel(e.target.value);
+                                  const p = e.target.value as 'claude' | 'gemini' | 'airforce';
+                                  setLlmProvider(p);
+                                  // Reset model to a sensible default for the new provider
+                                  if (p === 'claude') setModel('claude-sonnet-4-6');
+                                  else if (p === 'gemini') setModel('gemini-2.0-flash');
+                                  else if (p === 'airforce') {
+                                    if (airforceModels.length > 0) setModel(airforceModels[0]);
+                                    else fetchAirforceModels();
+                                  }
                                 }}
                                 className="w-full p-2 border border-indigo-300 dark:border-indigo-700 rounded-md bg-white dark:bg-indigo-900 text-indigo-900 dark:text-indigo-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                             >
-                                <option value="claude-sonnet-4-6">Claude Sonnet (Recommended)</option>
-                                <option value="claude-opus-4-6">Claude Opus (Most capable)</option>
-                                <option value="claude-haiku-4-5-20251001">Claude Haiku (Fastest)</option>
-                                <option disabled value="">── Gemini (requires Gemini key) ──</option>
-                                <option value="gemini-2.0-flash">Gemini 2.0 Flash (Fast)</option>
-                                <option value="gemini-1.5-pro">Gemini 1.5 Pro (Capable)</option>
-                                <option value="gemini-1.5-flash">Gemini 1.5 Flash (Fastest)</option>
+                                <option value="claude">Anthropic Claude</option>
+                                <option value="gemini">Google Gemini</option>
+                                <option value="airforce">api.airforce (100+ models)</option>
                             </select>
+                        </div>
+
+                        {/* Model selector — changes based on provider */}
+                        <div>
+                            <label className="block text-sm font-medium text-indigo-700 dark:text-indigo-300 mb-1">AI Model</label>
+
+                            {llmProvider === 'claude' && (
+                                <select
+                                    value={model}
+                                    onChange={(e) => setModel(e.target.value)}
+                                    className="w-full p-2 border border-indigo-300 dark:border-indigo-700 rounded-md bg-white dark:bg-indigo-900 text-indigo-900 dark:text-indigo-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                >
+                                    <option value="claude-sonnet-4-6">Claude Sonnet (Recommended)</option>
+                                    <option value="claude-opus-4-6">Claude Opus (Most capable)</option>
+                                    <option value="claude-haiku-4-5-20251001">Claude Haiku (Fastest)</option>
+                                </select>
+                            )}
+
+                            {llmProvider === 'gemini' && (
+                                <select
+                                    value={model}
+                                    onChange={(e) => setModel(e.target.value)}
+                                    className="w-full p-2 border border-indigo-300 dark:border-indigo-700 rounded-md bg-white dark:bg-indigo-900 text-indigo-900 dark:text-indigo-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                >
+                                    <option value="gemini-2.0-flash">Gemini 2.0 Flash (Fast)</option>
+                                    <option value="gemini-1.5-pro">Gemini 1.5 Pro (Capable)</option>
+                                    <option value="gemini-1.5-flash">Gemini 1.5 Flash (Fastest)</option>
+                                </select>
+                            )}
+
+                            {llmProvider === 'airforce' && (
+                                <div className="space-y-2">
+                                    {airforceModels.length > 0 ? (
+                                        <select
+                                            value={model}
+                                            onChange={(e) => setModel(e.target.value)}
+                                            className="w-full p-2 border border-indigo-300 dark:border-indigo-700 rounded-md bg-white dark:bg-indigo-900 text-indigo-900 dark:text-indigo-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                        >
+                                            {airforceModels.map(m => (
+                                                <option key={m} value={m}>{m}</option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <p className="text-xs text-indigo-500 dark:text-indigo-400">
+                                            {airforceModelsError || (isFetchingAFModels ? 'Loading models…' : 'No models loaded yet.')}
+                                        </p>
+                                    )}
+                                    <button
+                                        onClick={fetchAirforceModels}
+                                        disabled={isFetchingAFModels}
+                                        className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline disabled:opacity-50 flex items-center gap-1"
+                                    >
+                                        {isFetchingAFModels ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                                        {isFetchingAFModels ? 'Loading…' : airforceModels.length > 0 ? 'Refresh model list' : 'Load models from api.airforce'}
+                                    </button>
+                                    {airforceModelsError && <p className="text-xs text-red-500">{airforceModelsError}</p>}
+                                </div>
+                            )}
                         </div>
                         
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
