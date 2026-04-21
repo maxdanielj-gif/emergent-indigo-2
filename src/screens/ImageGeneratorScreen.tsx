@@ -7,9 +7,9 @@ import {
 // ── Constants ────────────────────────────────────────────────────────────────
 
 // ── WaveSpeed model registry ────────────────────────────────────────────────
-type WsModelId = 'wavespeed-ai/flux-2-klein-9b/edit' | 'bytedance/seedream-v4.5/edit' | 'z-ai/z-ai-glm-image-edit';
+type WsModelId = 'wavespeed-ai/flux-2-klein-9b/edit' | 'bytedance/seedream-v4.5/edit' | 'wavespeed-ai/z-image-turbo/image-to-image';
 
-const WS_MODELS: { id: WsModelId; name: string; maxImages: number; usesSeparateWH: boolean; hasSeed: boolean; hasOutputFormat: boolean; hasPromptExpansion: boolean; hasSafetyChecker: boolean }[] = [
+const WS_MODELS: { id: WsModelId; name: string; maxImages: number; usesSeparateWH: boolean; hasSeed: boolean; hasOutputFormat: boolean; hasPromptExpansion: boolean; hasSafetyChecker: boolean; usesStarSize?: boolean; hasSingleImage?: boolean; hasStrength?: boolean }[] = [
   {
     id: 'wavespeed-ai/flux-2-klein-9b/edit',
     name: 'Flux 2 Klein 9B (Default)',
@@ -31,14 +31,17 @@ const WS_MODELS: { id: WsModelId; name: string; maxImages: number; usesSeparateW
     hasSafetyChecker: false,
   },
   {
-    id: 'z-ai/z-ai-glm-image-edit',
-    name: 'Z.AI GLM Image Edit',
-    maxImages: 4,
-    usesSeparateWH: true,
+    id: 'wavespeed-ai/z-image-turbo/image-to-image',
+    name: 'Z Image Turbo (Image-to-Image)',
+    maxImages: 1,          // takes a single image field
+    usesSeparateWH: false,
     hasSeed: true,
     hasOutputFormat: true,
-    hasPromptExpansion: true,
+    hasPromptExpansion: false,
     hasSafetyChecker: false,
+    usesStarSize: true,    // size format: "1024*1024" not "1024x1024"
+    hasSingleImage: true,  // sends image: string, not images: string[]
+    hasStrength: true,     // strength parameter 0-1
   },
 ];
 
@@ -84,6 +87,7 @@ const ImageGeneratorScreen: React.FC = () => {
   const [wsModelId,      setWsModelId]      = useState<WsModelId>('wavespeed-ai/flux-2-klein-9b/edit');
   const [wsOutputFormat, setWsOutputFormat] = useState<'jpeg' | 'png'>('jpeg');
   const [wsPromptExpand, setWsPromptExpand] = useState(false);
+  const [wsStrength,     setWsStrength]     = useState(0.8);
 
   const activeModel = WS_MODELS.find(m => m.id === wsModelId) ?? WS_MODELS[0];
   // Clamp wsImages array length to match the selected model's max
@@ -234,18 +238,25 @@ const ImageGeneratorScreen: React.FC = () => {
       const body: any = {
         model: wsModelId,
         prompt: finalPrompt,
-        images: resolvedImages,
         apiKey: wavespeedApiKey,
       };
 
+      // Image(s) — single string vs array depending on model
+      if (activeModel.hasSingleImage) {
+        // Z Image Turbo takes a single "image" field
+        if (resolvedImages.length > 0) body.image = resolvedImages[0];
+      } else {
+        body.images = resolvedImages;
+      }
+
       // Model-specific parameters
       if (activeModel.hasSeed && wsSeed.trim()) body.seed = parseInt(wsSeed.trim(), 10);
-      if (activeModel.usesSeparateWH && wsSize.trim()) {
-        // GLM uses width + height separately
-        const parts = wsSize.trim().split('x');
-        if (parts.length === 2) { body.width = parseInt(parts[0], 10); body.height = parseInt(parts[1], 10); }
-      } else if (!activeModel.usesSeparateWH && wsSize.trim()) {
-        body.size = wsSize.trim();
+      if (activeModel.hasStrength) body.strength = wsStrength;
+      if (wsSize.trim()) {
+        // Z Image Turbo uses "1024*1024" format; others use "1024x1024"
+        body.size = activeModel.usesStarSize
+          ? wsSize.trim().replace('x', '*')
+          : wsSize.trim();
       }
       if (activeModel.hasOutputFormat) body.output_format = wsOutputFormat;
       if (activeModel.hasPromptExpansion) body.enable_prompt_expansion = wsPromptExpand;
@@ -412,7 +423,26 @@ const ImageGeneratorScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* GLM-specific options */}
+      {/* Model-specific options */}
+      {activeModel.hasStrength && (
+        <div className="p-3 bg-indigo-50 dark:bg-indigo-900/30 rounded-xl border border-indigo-100 dark:border-indigo-800 space-y-2">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-xs font-medium text-indigo-700 dark:text-indigo-300">Strength: {wsStrength.toFixed(2)}</p>
+              <p className="text-[10px] text-indigo-400 mt-0.5">How much the output changes from the reference. Lower = closer to original.</p>
+            </div>
+          </div>
+          <input
+            type="range" min={0} max={1} step={0.05} value={wsStrength}
+            onChange={e => setWsStrength(parseFloat(e.target.value))}
+            className="w-full h-2 bg-indigo-200 dark:bg-indigo-700 rounded-full appearance-none cursor-pointer accent-indigo-600"
+          />
+          <div className="flex justify-between text-[10px] text-indigo-400">
+            <span>Preserve original</span>
+            <span>Max change</span>
+          </div>
+        </div>
+      )}
       {activeModel.hasOutputFormat && (
         <div className="flex items-center justify-between p-3 bg-indigo-50 dark:bg-indigo-900/30 rounded-xl border border-indigo-100 dark:border-indigo-800">
           <div>
