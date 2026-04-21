@@ -811,8 +811,15 @@ const SettingsScreen: React.FC = () => {
                 <p className="text-xs font-medium text-indigo-700 dark:text-indigo-300 mb-1">Gallery Images (Firebase Storage)</p>
                 <p className="text-xs text-indigo-500 dark:text-indigo-400 mb-2">
                   Upload/download individual gallery images to Firebase Storage. Requires <strong>Storage Bucket</strong> to be configured above.
-                  {gallery.length > 0 ? ` You have ${gallery.length} image(s) in your local gallery.` : ' Your gallery is currently empty.'}
+                  {gallery.length > 0
+                    ? ` You have ${gallery.length} image(s) in your local gallery.`
+                    : ' Your gallery is currently empty.'}
                 </p>
+                {gallery.length === 0 && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mb-2">
+                    ⚠ If you have gallery images, visit the Gallery screen first — images load on demand and won't appear here until then.
+                  </p>
+                )}
                 <div className="grid grid-cols-2 gap-2">
                   {/* Backup */}
                   <div>
