@@ -6,8 +6,41 @@ import {
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-// WaveSpeed uses a single model — Flux 2 Klein 9B Edit
-const WS_MODEL_ID = 'wavespeed-ai/flux-2-klein-9b/edit';
+// ── WaveSpeed model registry ────────────────────────────────────────────────
+type WsModelId = 'wavespeed-ai/flux-2-klein-9b/edit' | 'bytedance/seedream-v4.5/edit' | 'z-ai/glm-image-edit';
+
+const WS_MODELS: { id: WsModelId; name: string; maxImages: number; usesSeparateWH: boolean; hasSeed: boolean; hasOutputFormat: boolean; hasPromptExpansion: boolean; hasSafetyChecker: boolean }[] = [
+  {
+    id: 'wavespeed-ai/flux-2-klein-9b/edit',
+    name: 'Flux 2 Klein 9B (Default)',
+    maxImages: 3,
+    usesSeparateWH: false,
+    hasSeed: true,
+    hasOutputFormat: false,
+    hasPromptExpansion: false,
+    hasSafetyChecker: true,
+  },
+  {
+    id: 'bytedance/seedream-v4.5/edit',
+    name: 'Bytedance Seedream V4.5',
+    maxImages: 10,
+    usesSeparateWH: false,
+    hasSeed: false,
+    hasOutputFormat: false,
+    hasPromptExpansion: false,
+    hasSafetyChecker: false,
+  },
+  {
+    id: 'z-ai/glm-image-edit',
+    name: 'Z.AI GLM Image Edit',
+    maxImages: 4,
+    usesSeparateWH: true,
+    hasSeed: true,
+    hasOutputFormat: true,
+    hasPromptExpansion: true,
+    hasSafetyChecker: false,
+  },
+];
 
 type JobStatus = 'idle' | 'creating' | 'waiting' | 'succeeded' | 'failed';
 
@@ -48,6 +81,13 @@ const ImageGeneratorScreen: React.FC = () => {
   const [wsSlot0Cleared, setWsSlot0Cleared] = useState(false);
   const [wsSeed,         setWsSeed]         = useState('');
   const [wsSize,         setWsSize]         = useState('');
+  const [wsModelId,      setWsModelId]      = useState<WsModelId>('wavespeed-ai/flux-2-klein-9b/edit');
+  const [wsOutputFormat, setWsOutputFormat] = useState<'jpeg' | 'png'>('jpeg');
+  const [wsPromptExpand, setWsPromptExpand] = useState(false);
+
+  const activeModel = WS_MODELS.find(m => m.id === wsModelId) ?? WS_MODELS[0];
+  // Clamp wsImages array length to match the selected model's max
+  const imageSlots = Math.min(activeModel.maxImages, 3); // show at most 3 slots in the UI for usability
 
   // ── Shared job state ──────────────────────────────────────────────────────
   const [jobStatus,    setJobStatus]    = useState<JobStatus>('idle');
@@ -192,22 +232,32 @@ const ImageGeneratorScreen: React.FC = () => {
       }).filter(Boolean) as string[];
 
       const body: any = {
-        model: WS_MODEL_ID,
+        model: wsModelId,
         prompt: finalPrompt,
         images: resolvedImages,
-        seed: wsSeed.trim() || undefined,
         apiKey: wavespeedApiKey,
       };
 
-      if (wsSize.trim()) body.size = wsSize.trim();
+      // Model-specific parameters
+      if (activeModel.hasSeed && wsSeed.trim()) body.seed = parseInt(wsSeed.trim(), 10);
+      if (activeModel.usesSeparateWH && wsSize.trim()) {
+        // GLM uses width + height separately
+        const parts = wsSize.trim().split('x');
+        if (parts.length === 2) { body.width = parseInt(parts[0], 10); body.height = parseInt(parts[1], 10); }
+      } else if (!activeModel.usesSeparateWH && wsSize.trim()) {
+        body.size = wsSize.trim();
+      }
+      if (activeModel.hasOutputFormat) body.output_format = wsOutputFormat;
+      if (activeModel.hasPromptExpansion) body.enable_prompt_expansion = wsPromptExpand;
+      if (activeModel.hasSafetyChecker) body.enable_safety_checker = false;
 
       const r = await fetch('/api/wavespeed/generate', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
       if (!r.ok) { const e = await r.json(); throw new Error(e.error || 'Failed'); }
       const result = await r.json();
       const taskId = result.taskId;
       if (!taskId) throw new Error(`No task ID returned. Response: ${JSON.stringify(result)}`);
-      console.log(`[ImageGen WaveSpeed] Task created: ${taskId}, refs: ${resolvedImages.length}`);
-      setJobStatus('waiting'); setStatusMsg('Generating with Flux 2 Klein 9B…');
+      console.log(`[ImageGen WaveSpeed] Task created: ${taskId}, model: ${wsModelId}, refs: ${resolvedImages.length}`);
+      setJobStatus('waiting'); setStatusMsg(`Generating with ${activeModel.name}…`);
       startPolling(taskId);
     } catch (e: any) {
       setJobStatus('failed'); setStatusMsg(e.message);
@@ -229,6 +279,26 @@ const ImageGeneratorScreen: React.FC = () => {
         <p className="text-xs text-indigo-400 dark:text-indigo-500 mt-0.5">Powered by WaveSpeed AI</p>
       </div>
 
+      {/* Model selector */}
+      <div>
+        <label className="block text-sm font-medium text-indigo-700 dark:text-indigo-300 mb-1">Model</label>
+        <select
+          value={wsModelId}
+          onChange={e => {
+            const newId = e.target.value as WsModelId;
+            setWsModelId(newId);
+            // Reset image slots array to match new model's max
+            setWsImages(Array(Math.min(WS_MODELS.find(m => m.id === newId)?.maxImages ?? 3, 3)).fill(null));
+            setWsSlot0Cleared(false);
+          }}
+          className="w-full p-2 border border-indigo-300 dark:border-indigo-700 rounded-xl bg-white dark:bg-indigo-950 text-indigo-900 dark:text-indigo-100 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+        >
+          {WS_MODELS.map(m => (
+            <option key={m.id} value={m.id}>{m.name}</option>
+          ))}
+        </select>
+      </div>
+
       {!wavespeedApiKey && (
         <div className="p-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-xl text-sm text-amber-700 dark:text-amber-300">
           Add your WaveSpeed API key in Settings. Get one at{' '}
@@ -240,12 +310,14 @@ const ImageGeneratorScreen: React.FC = () => {
       <div className="p-3 bg-indigo-50 dark:bg-indigo-900/30 rounded-xl border border-indigo-100 dark:border-indigo-800 space-y-3">
         <div>
           <p className="text-sm font-semibold text-indigo-800 dark:text-indigo-200">Reference Images</p>
-          <p className="text-[10px] text-indigo-400 dark:text-indigo-500 mt-0.5">Upload up to 3 images to guide the edit. Each slot has a suggested role, but you can use any image in any slot.</p>
+          <p className="text-[10px] text-indigo-400 dark:text-indigo-500 mt-0.5">
+            Upload up to {imageSlots} image{imageSlots > 1 ? 's' : ''} to guide the edit. Each slot has a suggested role, but you can use any image in any slot.
+          </p>
         </div>
-        <div className="grid grid-cols-3 gap-3">
-          {([0,1,2] as const).map(i => {
-            const WS_SLOT_LABELS  = ['Character / Face', 'Pose / Style', 'Scene / BG'] as const;
-            const WS_SLOT_HINTS   = ['Best for face & identity', 'Body pose & style guide', 'Background & scene'] as const;
+        <div className={`grid gap-3 ${imageSlots === 1 ? 'grid-cols-1' : imageSlots === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+          {Array.from({ length: imageSlots }, (_, i) => i).map(i => {
+            const WS_SLOT_LABELS  = ['Character / Face', 'Pose / Style', 'Scene / BG', 'Extra Ref 4', 'Extra Ref 5'];
+            const WS_SLOT_HINTS   = ['Best for face & identity', 'Body pose & style guide', 'Background & scene', 'Additional reference', 'Additional reference'];
             const label    = WS_SLOT_LABELS[i];
             const hint     = WS_SLOT_HINTS[i];
             const val      = wsImages[i];
@@ -303,7 +375,7 @@ const ImageGeneratorScreen: React.FC = () => {
           })}
         </div>
         <p className="text-[10px] text-indigo-400 dark:text-indigo-500">
-          Flux 2 Klein 9B sends your reference photos directly as subject guides for better character face consistency.
+          {activeModel.name} uses your reference photos as subject guides for better character consistency.
         </p>
       </div>
 
@@ -317,16 +389,18 @@ const ImageGeneratorScreen: React.FC = () => {
 
       {/* Seed + Size */}
       <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-medium text-indigo-700 dark:text-indigo-300 mb-1">
-            Seed <span className="font-normal text-indigo-400">(optional)</span>
-          </label>
-          <input type="number" value={wsSeed} onChange={e => setWsSeed(e.target.value)}
-            placeholder="-1 = random"
-            min={-1} max={4294967295}
-            className="w-full p-2 border border-indigo-300 dark:border-indigo-700 rounded-xl bg-white dark:bg-indigo-950 text-indigo-900 dark:text-indigo-100 text-xs focus:ring-2 focus:ring-indigo-500 outline-none" />
-          <p className="text-[10px] text-indigo-400 mt-0.5">Same seed = same image. -1 for random.</p>
-        </div>
+        {activeModel.hasSeed ? (
+          <div>
+            <label className="block text-xs font-medium text-indigo-700 dark:text-indigo-300 mb-1">
+              Seed <span className="font-normal text-indigo-400">(optional)</span>
+            </label>
+            <input type="number" value={wsSeed} onChange={e => setWsSeed(e.target.value)}
+              placeholder="-1 = random"
+              min={-1} max={4294967295}
+              className="w-full p-2 border border-indigo-300 dark:border-indigo-700 rounded-xl bg-white dark:bg-indigo-950 text-indigo-900 dark:text-indigo-100 text-xs focus:ring-2 focus:ring-indigo-500 outline-none" />
+            <p className="text-[10px] text-indigo-400 mt-0.5">Same seed = same image. -1 for random.</p>
+          </div>
+        ) : <div />}
         <div>
           <label className="block text-xs font-medium text-indigo-700 dark:text-indigo-300 mb-1">
             Size <span className="font-normal text-indigo-400">(optional)</span>
@@ -337,6 +411,38 @@ const ImageGeneratorScreen: React.FC = () => {
           <p className="text-[10px] text-indigo-400 mt-0.5">Leave empty to match input image size.</p>
         </div>
       </div>
+
+      {/* GLM-specific options */}
+      {activeModel.hasOutputFormat && (
+        <div className="flex items-center justify-between p-3 bg-indigo-50 dark:bg-indigo-900/30 rounded-xl border border-indigo-100 dark:border-indigo-800">
+          <div>
+            <p className="text-xs font-medium text-indigo-700 dark:text-indigo-300">Output Format</p>
+            <p className="text-[10px] text-indigo-400 mt-0.5">JPEG = smaller file, PNG = lossless quality</p>
+          </div>
+          <select
+            value={wsOutputFormat}
+            onChange={e => setWsOutputFormat(e.target.value as 'jpeg' | 'png')}
+            className="p-1.5 border border-indigo-300 dark:border-indigo-700 rounded-lg bg-white dark:bg-indigo-950 text-indigo-900 dark:text-indigo-100 text-xs"
+          >
+            <option value="jpeg">JPEG</option>
+            <option value="png">PNG</option>
+          </select>
+        </div>
+      )}
+      {activeModel.hasPromptExpansion && (
+        <div className="flex items-center justify-between p-3 bg-indigo-50 dark:bg-indigo-900/30 rounded-xl border border-indigo-100 dark:border-indigo-800">
+          <div>
+            <p className="text-xs font-medium text-indigo-700 dark:text-indigo-300">Prompt Expansion</p>
+            <p className="text-[10px] text-indigo-400 mt-0.5">Automatically enhances short prompts for better results</p>
+          </div>
+          <button
+            onClick={() => setWsPromptExpand(v => !v)}
+            className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${wsPromptExpand ? 'bg-indigo-600' : 'bg-indigo-200 dark:bg-indigo-800'}`}
+          >
+            <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${wsPromptExpand ? 'translate-x-4' : 'translate-x-0.5'}`} />
+          </button>
+        </div>
+      )}
 
       {/* Generate button */}
       <button
