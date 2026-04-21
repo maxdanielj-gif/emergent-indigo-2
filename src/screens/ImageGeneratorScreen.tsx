@@ -7,7 +7,7 @@ import {
 // ── Constants ────────────────────────────────────────────────────────────────
 
 // ── WaveSpeed model registry ────────────────────────────────────────────────
-type WsModelId = 'wavespeed-ai/flux-2-klein-9b/edit' | 'bytedance/seedream-v4.5/edit' | 'z-ai/glm-image-edit';
+type WsModelId = 'wavespeed-ai/flux-2-klein-9b/edit' | 'bytedance/seedream-v4.5/edit' | 'z-ai/z-ai-glm-image-edit';
 
 const WS_MODELS: { id: WsModelId; name: string; maxImages: number; usesSeparateWH: boolean; hasSeed: boolean; hasOutputFormat: boolean; hasPromptExpansion: boolean; hasSafetyChecker: boolean }[] = [
   {
@@ -31,7 +31,7 @@ const WS_MODELS: { id: WsModelId; name: string; maxImages: number; usesSeparateW
     hasSafetyChecker: false,
   },
   {
-    id: 'z-ai/glm-image-edit',
+    id: 'z-ai/z-ai-glm-image-edit',
     name: 'Z.AI GLM Image Edit',
     maxImages: 4,
     usesSeparateWH: true,
