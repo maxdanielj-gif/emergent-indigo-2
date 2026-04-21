@@ -245,6 +245,20 @@ export async function restoreFromFirestore(
 }
 
 // ── Upload gallery images to Firebase Storage ─────────────────────────────────
+// Wraps a Promise with a timeout so Firebase Storage hangs don't block forever.
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(
+      `Timed out after ${ms / 1000}s during "${label}". ` +
+      `Check your Firebase Storage Bucket URL in Settings — it should look like ` +
+      `"your-project.firebasestorage.app" or "your-project.appspot.com". ` +
+      `Also check that Firebase Storage security rules allow writes.`
+    )), ms);
+    promise.then(v => { clearTimeout(timer); resolve(v); },
+                 e => { clearTimeout(timer); reject(e); });
+  });
+}
+
 export async function uploadGalleryToFirebaseStorage(
   userId: string,
   gallery: Array<{ id?: string; url: string; prompt?: string; provider?: string; createdAt?: number }>,
@@ -253,13 +267,25 @@ export async function uploadGalleryToFirebaseStorage(
 ): Promise<number> {
   if (!userId?.trim()) throw new Error("A User ID is required. Set one in Settings → Cloud Sync.");
 
+  const storageBucket = runtime?.storageBucket || import.meta.env.VITE_FIREBASE_STORAGE_BUCKET;
+  if (!storageBucket?.trim()) {
+    throw new Error(
+      "Firebase Storage Bucket is not set. Fill in the Storage Bucket field in Settings → Firebase Configuration. " +
+      "It should look like: your-project.firebasestorage.app"
+    );
+  }
+
   const app = getApp(runtime);
-  if (!currentStorage) currentStorage = getStorage(app);
-  const storage = currentStorage;
+  // Always get a fresh Storage instance using the explicit bucket URL to avoid
+  // silent mismatches when currentStorage was initialised with a different bucket.
+  const storage = getStorage(app, `gs://${storageBucket.replace(/^gs:\/\//, '').trim()}`);
   const db = getDb(runtime);
 
   const validItems = gallery.filter(item => item.url && item.url.startsWith('data:'));
-  if (validItems.length === 0) throw new Error("No local gallery images found to upload.");
+  if (validItems.length === 0) throw new Error(
+    "No local gallery images found to upload. " +
+    "Images must be stored locally (as data: URLs) to be backed up."
+  );
 
   let uploaded = 0;
   const manifest: Array<{ id: string; path: string; downloadUrl: string; prompt?: string; provider?: string }> = [];
@@ -271,11 +297,20 @@ export async function uploadGalleryToFirebaseStorage(
     const base64 = item.url.includes(',') ? item.url.split(',')[1] : item.url;
     const itemId = item.id || `item_${i}_${Date.now()}`;
     const path = `${userId.trim()}/gallery/${itemId}.${ext}`;
-
     const fileRef = storageRef(storage, path);
-    await uploadString(fileRef, base64, 'base64', { contentType: `image/${ext}` });
-    // Store the download URL so restore doesn't need to re-derive it
-    const downloadUrl = await getDownloadURL(fileRef);
+
+    // 60-second timeout per image — if uploadString hangs, surface a clear error
+    // instead of silently blocking forever.
+    await withTimeout(
+      uploadString(fileRef, base64, 'base64', { contentType: `image/${ext}` }),
+      60_000,
+      `uploading image ${i + 1}/${validItems.length}`
+    );
+    const downloadUrl = await withTimeout(
+      getDownloadURL(fileRef),
+      15_000,
+      `getting download URL for image ${i + 1}`
+    );
     manifest.push({ id: itemId, path, downloadUrl, prompt: item.prompt, provider: item.provider });
     uploaded++;
 
