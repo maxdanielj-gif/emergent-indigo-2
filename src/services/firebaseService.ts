@@ -311,7 +311,7 @@ export async function uploadGalleryToFirebaseStorage(
       15_000,
       `getting download URL for image ${i + 1}`
     );
-    manifest.push({ id: itemId, path, downloadUrl, prompt: item.prompt, provider: item.provider });
+    manifest.push({ id: itemId, path, downloadUrl, prompt: item.prompt ?? null, provider: item.provider ?? null });
     uploaded++;
 
     if (onProgress) onProgress(uploaded, validItems.length);
