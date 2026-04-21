@@ -235,6 +235,13 @@ const ImageGeneratorScreen: React.FC = () => {
         return null;
       }).filter(Boolean) as string[];
 
+      // Z Image Turbo (and any hasSingleImage model) requires at least one reference image
+      if (activeModel.hasSingleImage && resolvedImages.length === 0) {
+        addToast({ title: 'Reference image required', message: `${activeModel.name} needs a reference image to edit. Upload one in the slot above.`, type: 'warning' });
+        setJobStatus('idle');
+        return;
+      }
+
       const body: any = {
         model: wsModelId,
         prompt: finalPrompt,
@@ -243,8 +250,7 @@ const ImageGeneratorScreen: React.FC = () => {
 
       // Image(s) — single string vs array depending on model
       if (activeModel.hasSingleImage) {
-        // Z Image Turbo takes a single "image" field
-        if (resolvedImages.length > 0) body.image = resolvedImages[0];
+        body.image = resolvedImages[0];
       } else {
         body.images = resolvedImages;
       }
@@ -341,7 +347,7 @@ const ImageGeneratorScreen: React.FC = () => {
             return (
               <div key={i} className="space-y-1">
                 <p className="text-xs font-medium text-indigo-700 dark:text-indigo-300">
-                  {label}{isAutoFilled ? <span className="text-[9px] text-indigo-400 ml-1">(auto)</span> : ''}
+                  {label}{isAutoFilled ? <span className="text-[9px] text-indigo-400 ml-1">(auto)</span> : ''}{activeModel.hasSingleImage && i === 0 ? <span className="text-[9px] text-red-400 ml-1">(required)</span> : ''}
                 </p>
                 <p className="text-[9px] text-indigo-400 dark:text-indigo-500">{hint}</p>
                 {displayImg ? (
