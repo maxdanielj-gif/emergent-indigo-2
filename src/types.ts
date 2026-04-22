@@ -25,7 +25,10 @@ export interface AIProfile {
   voiceSpeed?: number;
   autoReadMessages?: boolean;
   voiceDescription?: string;
-  voiceProvider?: 'browser' | 'elevenlabs';
+  voiceProvider?: 'browser' | 'elevenlabs' | 'gemini';
+  geminiTtsVoice?: string;       // Gemini TTS voice name e.g. "Kore", "Aoede"
+  geminiTtsModel?: string;       // Gemini TTS model ID
+  geminiTtsStyle?: string;       // Natural language style prompt for Gemini TTS
   asyncVoiceId?: string | null;
   responseLength: 'short' | 'medium' | 'long' | 'custom';
   responseDetail: 'low' | 'medium' | 'high' | 'standard';
