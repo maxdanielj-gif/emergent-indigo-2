@@ -1371,7 +1371,6 @@ const AIProfileScreen: React.FC = () => {
                                         }}
                                         className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center justify-center ${voiceProvider === 'gemini' ? 'bg-white dark:bg-indigo-800 text-indigo-600 dark:text-indigo-100 shadow-sm' : 'text-indigo-400 dark:text-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-300'}`}
                                     >
-                                        <Sparkles className="w-3 h-3 mr-1" />
                                         Gemini
                                     </button>
                                 </div>

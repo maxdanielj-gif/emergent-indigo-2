@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Send, Image as ImageIcon, Mic, Paperclip, Volume2, RotateCcw, Edit2, X, FileText, CheckCheck, Loader2, Camera, Trash2, ExternalLink, Plus, MessageSquare, History, MoreVertical, ChevronLeft, ChevronRight, Search, Star, Headphones, ArrowDown, Sparkles } from 'lucide-react';
+import { Send, Image as ImageIcon, Mic, Paperclip, Volume2, RotateCcw, Edit2, X, FileText, CheckCheck, Loader2, Camera, Trash2, ExternalLink, Plus, MessageSquare, History, MoreVertical, ChevronLeft, ChevronRight, Search, Star, Headphones, ArrowDown} from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useChat } from '../context/ChatContext';
 import { generateElevenLabsSpeech } from '../services/asyncService';
@@ -847,7 +847,7 @@ const ChatScreen: React.FC = () => {
                     className="flex flex-col items-center justify-center h-full text-center p-8"
                 >
                     <div className="w-20 h-20 bg-indigo-100 dark:bg-indigo-900 rounded-3xl flex items-center justify-center mb-6 shadow-inner">
-                        <Sparkles className="w-10 h-10 text-indigo-500 dark:text-indigo-400" />
+                        <MessageSquare className="w-10 h-10 text-indigo-500 dark:text-indigo-400" />
                     </div>
                     <h3 className="text-xl font-bold text-indigo-900 dark:text-indigo-50 mb-2">Start a conversation</h3>
                     <p className="text-indigo-700 dark:text-indigo-300 max-w-xs text-sm leading-relaxed">
