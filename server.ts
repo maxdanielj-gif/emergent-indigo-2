@@ -758,11 +758,10 @@ app.post("/api/tts/gemini", express.json(), async (req, res) => {
     const requestBody: any = {
       contents: [{ parts: [{ text }] }],
       generationConfig: {
-        responseModalities: ["AUDIO"],
-        speechConfig: {
-          audioConfig: { audioEncoding: "MP3" },
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName },
+        response_modalities: ["AUDIO"],
+        speech_config: {
+          voice_config: {
+            prebuilt_voice_config: { voice_name: voiceName },
           },
         },
       },
