@@ -743,6 +743,73 @@ app.post("/api/chat", async (req, res) => {
 
 
 
+
+// ── Gemini TTS ────────────────────────────────────────────────────────────────
+app.post("/api/tts/gemini", express.json(), async (req, res) => {
+  const { text, voiceName, modelId, stylePrompt, geminiKey: clientKey } = req.body;
+  if (!text || !voiceName) return res.status(400).json({ error: "Missing text or voiceName" });
+
+  const apiKey = clientKey || process.env.GEMINI_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: "Gemini API key not configured. Add it in Settings." });
+
+  const model = modelId || "gemini-2.5-flash-preview-tts";
+
+  try {
+    const requestBody: any = {
+      contents: [{ parts: [{ text }] }],
+      generationConfig: {
+        responseModalities: ["AUDIO"],
+        speechConfig: {
+          audioConfig: { audioEncoding: "MP3" },
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName },
+          },
+        },
+      },
+    };
+
+    // Optional natural-language style prompt
+    if (stylePrompt?.trim()) {
+      requestBody.system_instruction = {
+        parts: [{ text: stylePrompt.trim() }],
+      };
+    }
+
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      {
+        method: "POST",
+        headers: {
+          "x-goog-api-key": apiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      }
+    );
+
+    if (!r.ok) {
+      const errText = await r.text();
+      console.error(`Gemini TTS error ${r.status}:`, errText);
+      return res.status(r.status).json({ error: `Gemini TTS error: ${errText}` });
+    }
+
+    const data = await r.json();
+    const part = data.candidates?.[0]?.content?.parts?.[0];
+    if (!part?.inlineData?.data) {
+      console.error("Gemini TTS: no audio in response", JSON.stringify(data).slice(0, 300));
+      return res.status(500).json({ error: "Gemini TTS returned no audio data." });
+    }
+
+    const audioBuffer = Buffer.from(part.inlineData.data, "base64");
+    const mimeType = part.inlineData.mimeType || "audio/mp3";
+    res.setHeader("Content-Type", mimeType);
+    res.send(audioBuffer);
+  } catch (e: any) {
+    console.error("Gemini TTS error:", e);
+    res.status(500).json({ error: e.message || "Failed to generate speech with Gemini TTS" });
+  }
+});
+
 // ── Api.Airforce: fetch available text/chat models ────────────────────────────
 const AIRFORCE_BASE = "https://api.airforce";
 
