@@ -207,7 +207,7 @@ const AIProfileScreen: React.FC = () => {
     setVoiceDescription(aiProfile.voiceDescription || '');
     setVoiceProvider((aiProfile.voiceProvider === 'elevenlabs') ? 'elevenlabs' : (aiProfile.voiceProvider === 'gemini') ? 'gemini' : 'browser');
     setGeminiTtsVoice(aiProfile.geminiTtsVoice || 'Kore');
-    setGeminiTtsModel(aiProfile.geminiTtsModel || 'gemini-2.5-flash-preview-tts');
+    setGeminiTtsModel(aiProfile.geminiTtsModel || 'gemini-2.5-flash-tts');
     setGeminiTtsStyle(aiProfile.geminiTtsStyle || '');
     setResponseLength(aiProfile.responseLength || 'medium');
     setResponseDetail(aiProfile.responseDetail || 'standard');
@@ -649,7 +649,7 @@ const AIProfileScreen: React.FC = () => {
   const [elevenLabsVoices, setElevenLabsVoices] = useState<any[]>([]);
   // Gemini TTS state
   const [geminiTtsVoice, setGeminiTtsVoice] = useState<string>(aiProfile.geminiTtsVoice || 'Kore');
-  const [geminiTtsModel, setGeminiTtsModel] = useState<string>(aiProfile.geminiTtsModel || 'gemini-2.5-flash-preview-tts');
+  const [geminiTtsModel, setGeminiTtsModel] = useState<string>(aiProfile.geminiTtsModel || 'gemini-2.5-flash-tts');
   const [geminiTtsStyle, setGeminiTtsStyle] = useState<string>(aiProfile.geminiTtsStyle || '');
   const [isLoadingElevenLabsVoices, setIsLoadingElevenLabsVoices] = useState(false);
   const [elevenLabsVoiceId, setElevenLabsVoiceId] = useState<string>(aiProfile.asyncVoiceId || '');
@@ -1629,8 +1629,8 @@ const AIProfileScreen: React.FC = () => {
                                             onChange={e => setGeminiTtsModel(e.target.value)}
                                             className="w-full p-2 border border-indigo-300 dark:border-indigo-700 rounded-lg bg-white dark:bg-indigo-950 text-indigo-900 dark:text-indigo-100 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                                         >
-                                            <option value="gemini-2.5-flash-preview-tts">Gemini 2.5 Flash (Fast, efficient)</option>
-                                            <option value="gemini-2.5-pro-preview-tts">Gemini 2.5 Pro (Highest quality)</option>
+                                            <option value="gemini-2.5-flash-tts">Gemini 2.5 Flash (Fast, efficient)</option>
+                                            <option value="gemini-2.5-pro-tts">Gemini 2.5 Pro (Highest quality)</option>
                                             <option value="gemini-3.1-flash-tts-preview">Gemini 3.1 Flash (Latest)</option>
                                         </select>
                                     </div>
