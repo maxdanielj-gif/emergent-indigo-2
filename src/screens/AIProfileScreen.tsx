@@ -48,8 +48,8 @@ const AIProfileScreen: React.FC = () => {
   const [voiceSpeed, setVoiceSpeed] = useState(aiProfile.voiceSpeed || 1.0);
   const [autoReadMessages, setAutoReadMessages] = useState(aiProfile.autoReadMessages || false);
   const [voiceDescription, setVoiceDescription] = useState(aiProfile.voiceDescription || '');
-  const [voiceProvider, setVoiceProvider] = useState<'browser' | 'elevenlabs'>(
-    (aiProfile.voiceProvider === 'elevenlabs') ? 'elevenlabs' : 'browser'
+  const [voiceProvider, setVoiceProvider] = useState<'browser' | 'elevenlabs' | 'gemini'>(
+    (aiProfile.voiceProvider === 'elevenlabs') ? 'elevenlabs' : (aiProfile.voiceProvider === 'gemini') ? 'gemini' : 'browser'
   );
   const [responseLength, setResponseLength] = useState<AIProfile['responseLength']>(aiProfile.responseLength || 'medium');
   const [responseDetail, setResponseDetail] = useState<AIProfile['responseDetail']>(aiProfile.responseDetail || 'standard');
@@ -143,6 +143,30 @@ const AIProfileScreen: React.FC = () => {
         addToast({ title: "Voice Error", message: error.message || "ElevenLabs TTS failed.", type: "error" });
         setIsTestingVoice(false);
       }
+    } else if (voiceProvider === 'gemini') {
+      try {
+        const r = await fetch('/api/tts/gemini', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text,
+            voiceName: geminiTtsVoice,
+            modelId: geminiTtsModel,
+            stylePrompt: geminiTtsStyle || undefined,
+            geminiKey: geminiApiKey || undefined,
+          }),
+        });
+        if (!r.ok) { const e = await r.json(); throw new Error(e.error || 'Gemini TTS failed'); }
+        const blob = await r.blob();
+        const audioUrl = URL.createObjectURL(blob);
+        const audio = new Audio(audioUrl);
+        audio.onended = () => { setIsTestingVoice(false); URL.revokeObjectURL(audioUrl); };
+        audio.onerror = () => { setIsTestingVoice(false); URL.revokeObjectURL(audioUrl); };
+        audio.play().catch(() => setIsTestingVoice(false));
+      } catch (error: any) {
+        addToast({ title: 'Voice Error', message: error.message || 'Gemini TTS failed.', type: 'error' });
+        setIsTestingVoice(false);
+      }
     } else {
       speakWithBrowser(text);
     }
@@ -181,7 +205,10 @@ const AIProfileScreen: React.FC = () => {
     setVoiceSpeed(aiProfile.voiceSpeed || 1.0);
     setAutoReadMessages(aiProfile.autoReadMessages || false);
     setVoiceDescription(aiProfile.voiceDescription || '');
-    setVoiceProvider((aiProfile.voiceProvider === 'elevenlabs') ? 'elevenlabs' : 'browser');
+    setVoiceProvider((aiProfile.voiceProvider === 'elevenlabs') ? 'elevenlabs' : (aiProfile.voiceProvider === 'gemini') ? 'gemini' : 'browser');
+    setGeminiTtsVoice(aiProfile.geminiTtsVoice || 'Kore');
+    setGeminiTtsModel(aiProfile.geminiTtsModel || 'gemini-2.5-flash-preview-tts');
+    setGeminiTtsStyle(aiProfile.geminiTtsStyle || '');
     setResponseLength(aiProfile.responseLength || 'medium');
     setResponseDetail(aiProfile.responseDetail || 'standard');
     setResponseTone(aiProfile.responseTone || 'friendly');
@@ -295,6 +322,9 @@ const AIProfileScreen: React.FC = () => {
       elSpeakingRate,
       dynamicEmotion,
       asyncVoiceId: elevenLabsVoiceId || aiProfile.asyncVoiceId,
+      geminiTtsVoice,
+      geminiTtsModel,
+      geminiTtsStyle,
       aiCanUseTools: aiProfile.aiCanUseTools,
       aiCanBrowse: aiProfile.aiCanBrowse,
       chatHistory: aiProfile.chatHistory,
@@ -359,6 +389,9 @@ const AIProfileScreen: React.FC = () => {
       textOnlyMode,
       elevenLabsModelId,
       asyncVoiceId: elevenLabsVoiceId || aiProfile.asyncVoiceId,
+      geminiTtsVoice,
+      geminiTtsModel,
+      geminiTtsStyle,
       elStability,
       elSimilarity,
       elStyle,
@@ -533,6 +566,9 @@ const AIProfileScreen: React.FC = () => {
         voiceDescription,
         voiceProvider,
         asyncVoiceId: elevenLabsVoiceId || aiProfile.asyncVoiceId,
+      geminiTtsVoice,
+      geminiTtsModel,
+      geminiTtsStyle,
         elevenLabsModelId,
         elStability,
         elSimilarity,
@@ -611,6 +647,10 @@ const AIProfileScreen: React.FC = () => {
 
   const [isLoadingLibraryVoices, setIsLoadingLibraryVoices] = useState(false);
   const [elevenLabsVoices, setElevenLabsVoices] = useState<any[]>([]);
+  // Gemini TTS state
+  const [geminiTtsVoice, setGeminiTtsVoice] = useState<string>(aiProfile.geminiTtsVoice || 'Kore');
+  const [geminiTtsModel, setGeminiTtsModel] = useState<string>(aiProfile.geminiTtsModel || 'gemini-2.5-flash-preview-tts');
+  const [geminiTtsStyle, setGeminiTtsStyle] = useState<string>(aiProfile.geminiTtsStyle || '');
   const [isLoadingElevenLabsVoices, setIsLoadingElevenLabsVoices] = useState(false);
   const [elevenLabsVoiceId, setElevenLabsVoiceId] = useState<string>(aiProfile.asyncVoiceId || '');
   const [elevenLabsModelId, setElevenLabsModelId] = useState<string>('eleven_v3');
@@ -1324,10 +1364,21 @@ const AIProfileScreen: React.FC = () => {
                                         <Headphones className="w-3 h-3 mr-1" />
                                         ElevenLabs
                                     </button>
+                                    <button
+                                        onClick={() => {
+                                            setVoiceProvider('gemini');
+                                            setAIProfile({ ...aiProfile, voiceProvider: 'gemini', aiCanGenerateSpeech: aiCanGenerateSpeech });
+                                        }}
+                                        className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center justify-center ${voiceProvider === 'gemini' ? 'bg-white dark:bg-indigo-800 text-indigo-600 dark:text-indigo-100 shadow-sm' : 'text-indigo-400 dark:text-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-300'}`}
+                                    >
+                                        <Sparkles className="w-3 h-3 mr-1" />
+                                        Gemini
+                                    </button>
                                 </div>
                                 <p className="mt-2 text-[10px] text-indigo-500 dark:text-indigo-400">
                                     {voiceProvider === 'elevenlabs' && "Premium ElevenLabs voices. Requires an ElevenLabs API key in Settings."}
                                     {voiceProvider === 'browser' && "Uses your device's built-in speech engine. No API key required."}
+                                    {voiceProvider === 'gemini' && "Natural-sounding Google voices with style control. Requires a Gemini API key in Settings."}
                                 </p>
                             </div>
 
@@ -1567,6 +1618,66 @@ const AIProfileScreen: React.FC = () => {
                                             </div>
                                         </div>
                                     </div>
+                                </div>
+                            )}
+                            {voiceProvider === 'gemini' && (
+                                <div className="p-4 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 rounded-lg space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    {/* Model */}
+                                    <div>
+                                        <label className="block text-sm font-bold text-indigo-900 dark:text-indigo-100 mb-1">Model</label>
+                                        <select
+                                            value={geminiTtsModel}
+                                            onChange={e => setGeminiTtsModel(e.target.value)}
+                                            className="w-full p-2 border border-indigo-300 dark:border-indigo-700 rounded-lg bg-white dark:bg-indigo-950 text-indigo-900 dark:text-indigo-100 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                        >
+                                            <option value="gemini-2.5-flash-preview-tts">Gemini 2.5 Flash (Fast, efficient)</option>
+                                            <option value="gemini-2.5-pro-preview-tts">Gemini 2.5 Pro (Highest quality)</option>
+                                            <option value="gemini-3.1-flash-tts-preview">Gemini 3.1 Flash (Latest)</option>
+                                        </select>
+                                    </div>
+                                    {/* Voice */}
+                                    <div>
+                                        <label className="block text-sm font-bold text-indigo-900 dark:text-indigo-100 mb-1">Voice</label>
+                                        <select
+                                            value={geminiTtsVoice}
+                                            onChange={e => setGeminiTtsVoice(e.target.value)}
+                                            className="w-full p-2 border border-indigo-300 dark:border-indigo-700 rounded-lg bg-white dark:bg-indigo-950 text-indigo-900 dark:text-indigo-100 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                        >
+                                            <optgroup label="Female">
+                                                {['Achernar','Aoede','Autonoe','Callirrhoe','Despina','Erinome','Gacrux','Kore','Laomedeia','Leda','Pulcherrima','Sulafat','Vindemiatrix','Zephyr'].map(v => (
+                                                    <option key={v} value={v}>{v}</option>
+                                                ))}
+                                            </optgroup>
+                                            <optgroup label="Male">
+                                                {['Achird','Algenib','Algieba','Alnilam','Charon','Enceladus','Fenrir','Iapetus','Orus','Puck','Rasalgethi','Sadachbia','Sadaltager','Schedar','Umbriel'].map(v => (
+                                                    <option key={v} value={v}>{v}</option>
+                                                ))}
+                                            </optgroup>
+                                        </select>
+                                    </div>
+                                    {/* Style prompt */}
+                                    <div>
+                                        <label className="block text-sm font-bold text-indigo-900 dark:text-indigo-100 mb-1">
+                                            Style Prompt <span className="text-xs font-normal text-indigo-400">(optional)</span>
+                                        </label>
+                                        <textarea
+                                            value={geminiTtsStyle}
+                                            onChange={e => setGeminiTtsStyle(e.target.value)}
+                                            rows={2}
+                                            placeholder="e.g. Speak warmly and with gentle enthusiasm. Use a calm, friendly tone."
+                                            className="w-full p-2 border border-indigo-300 dark:border-indigo-700 rounded-lg bg-white dark:bg-indigo-950 text-indigo-900 dark:text-indigo-100 text-xs focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
+                                        />
+                                        <p className="text-[10px] text-indigo-400 mt-1">Describe how the voice should sound using natural language.</p>
+                                    </div>
+                                    {/* Test button */}
+                                    <button
+                                        onClick={handleTestVoice}
+                                        disabled={isTestingVoice}
+                                        className="flex items-center space-x-2 py-2 px-6 bg-indigo-600 text-white rounded-full text-sm font-medium hover:bg-indigo-700 transition-all disabled:opacity-50 shadow-md"
+                                    >
+                                        {isTestingVoice ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                                        <span>Test Gemini Voice</span>
+                                    </button>
                                 </div>
                             )}
                             </div>

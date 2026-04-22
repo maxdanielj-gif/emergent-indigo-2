@@ -276,6 +276,30 @@ const ChatScreen: React.FC = () => {
         addToast({ title: 'ElevenLabs TTS failed', message: e.message || 'Falling back to browser voice.', type: 'error' });
         speakWithBrowser(text, messageId);
       }
+    } else if (aiProfile.voiceProvider === 'gemini' && aiProfile.geminiTtsVoice) {
+      try {
+        const r = await fetch('/api/tts/gemini', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text,
+            voiceName: aiProfile.geminiTtsVoice,
+            modelId: aiProfile.geminiTtsModel || 'gemini-2.5-flash-preview-tts',
+            stylePrompt: aiProfile.geminiTtsStyle || undefined,
+            geminiKey: geminiApiKey || undefined,
+          }),
+        });
+        if (!r.ok) { const e = await r.json(); throw new Error(e.error || 'Gemini TTS failed'); }
+        const blob = await r.blob();
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audio.onended = () => { onEnd(); URL.revokeObjectURL(url); };
+        audio.onerror = () => { URL.revokeObjectURL(url); speakWithBrowser(text, messageId); };
+        audio.play();
+      } catch (e: any) {
+        addToast({ title: 'Gemini TTS failed', message: e.message || 'Falling back to browser voice.', type: 'error' });
+        speakWithBrowser(text, messageId);
+      }
     } else {
       speakWithBrowser(text, messageId);
     }
