@@ -752,11 +752,20 @@ app.post("/api/tts/gemini", express.json(), async (req, res) => {
   const apiKey = clientKey || process.env.GEMINI_API_KEY;
   if (!apiKey) return res.status(500).json({ error: "Gemini API key not configured. Add it in Settings." });
 
-  const model = modelId || "gemini-2.5-flash-preview-tts";
+  const model = modelId || "gemini-2.5-flash-tts";
 
   try {
+    // TTS models crash with 500 if a system_instruction is provided.
+    // Fold the style prompt into the user message instead.
+    // Append an explicit audio intent phrase to prevent the server's intent
+    // check from treating the request as a text output (causes 500 errors).
+    const intentPhrase = "Please generate the audio for the text above.";
+    const userText = stylePrompt?.trim()
+      ? `${stylePrompt.trim()}\n\n${text}\n\n${intentPhrase}`
+      : `${text}\n\n${intentPhrase}`;
+
     const requestBody: any = {
-      contents: [{ parts: [{ text }] }],
+      contents: [{ parts: [{ text: userText }] }],
       generationConfig: {
         response_modalities: ["AUDIO"],
         speech_config: {
@@ -766,13 +775,6 @@ app.post("/api/tts/gemini", express.json(), async (req, res) => {
         },
       },
     };
-
-    // Optional natural-language style prompt
-    if (stylePrompt?.trim()) {
-      requestBody.system_instruction = {
-        parts: [{ text: stylePrompt.trim() }],
-      };
-    }
 
     const r = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
