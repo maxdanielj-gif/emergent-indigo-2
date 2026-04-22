@@ -809,7 +809,9 @@ const WAVESPEED_MODELS = {
 // Submit WaveSpeed image generation task
 app.post("/api/wavespeed/generate", express.json({ limit: "20mb" }), async (req, res) => {
   const {
-    model, prompt, images, loras, seed, size,
+    model, prompt, images, image, loras, seed, size,
+    width, height, output_format, enable_prompt_expansion,
+    strength,
     apiKey: userApiKey,
   } = req.body;
 
@@ -828,21 +830,32 @@ app.post("/api/wavespeed/generate", express.json({ limit: "20mb" }), async (req,
       enable_safety_checker: false,
     };
 
-    // Size (width x height) — optional, defaults to input image size
+    // Size — pass through as-is (frontend already formats correctly per model)
     if (size) body.size = size;
+    // Separate width/height (GLM Image Edit)
+    if (width)  body.width  = parseInt(width, 10);
+    if (height) body.height = parseInt(height, 10);
 
-    // Images — model-specific field names:
-    // Qwen models use "image" (singular string, first image only)
-    // Flux/other models use "images" (array, max 3)
-    if (Array.isArray(images) && images.length > 0) {
+    // Output format (GLM, Z Image Turbo)
+    if (output_format) body.output_format = output_format;
+    // Prompt expansion (GLM)
+    if (enable_prompt_expansion !== undefined) body.enable_prompt_expansion = enable_prompt_expansion;
+    // Strength (Z Image Turbo)
+    if (strength !== undefined) body.strength = strength;
+
+    // Images — three possible cases:
+    // 1. singular "image" string (Z Image Turbo, Qwen)
+    // 2. "images" array (Flux, Seedream, GLM)
+    if (image) {
+      // Frontend explicitly sent a singular image field
+      body.image = image;
+    } else if (Array.isArray(images) && images.length > 0) {
       const cleanImages = images.filter(Boolean);
       const isQwen = model.includes('qwen-image');
       if (isQwen) {
-        // Qwen edit models want "image" as a single string
         body.image = cleanImages[0];
       } else {
-        // Flux Klein, Turbo, etc. want "images" array, max 3
-        body.images = cleanImages.slice(0, 3);
+        body.images = cleanImages.slice(0, 10);
       }
     }
 
@@ -854,7 +867,7 @@ app.post("/api/wavespeed/generate", express.json({ limit: "20mb" }), async (req,
       }));
     }
 
-    console.log(`WaveSpeed submit — model:${model}, images:${body.images?.length || 0}, loras:${body.loras?.length || 0}, seed:${body.seed}, prompt:"${body.prompt.slice(0, 100)}"`);
+    console.log(`WaveSpeed submit — model:${model}, image:${!!body.image}, images:${body.images?.length || 0}, seed:${body.seed}, prompt:"${body.prompt.slice(0, 100)}"`);
 
     const r = await fetch(`${WAVESPEED_BASE}/${model}`, {
       method: "POST",
