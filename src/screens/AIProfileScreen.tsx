@@ -156,7 +156,16 @@ const AIProfileScreen: React.FC = () => {
             geminiKey: geminiApiKey || undefined,
           }),
         });
-        if (!r.ok) { const e = await r.json(); throw new Error(e.error || 'Gemini TTS failed'); }
+        if (!r.ok) {
+          let errMsg = `HTTP ${r.status}`;
+          try { const e = await r.json(); errMsg = e.error || JSON.stringify(e); } catch { errMsg = await r.text().catch(() => errMsg); }
+          throw new Error(errMsg);
+        }
+        const contentType = r.headers.get('content-type') || '';
+        if (!contentType.includes('audio')) {
+          const body = await r.text();
+          throw new Error(`Expected audio, got: ${body.slice(0, 200)}`);
+        }
         const blob = await r.blob();
         const audioUrl = URL.createObjectURL(blob);
         const audio = new Audio(audioUrl);
@@ -164,7 +173,9 @@ const AIProfileScreen: React.FC = () => {
         audio.onerror = () => { setIsTestingVoice(false); URL.revokeObjectURL(audioUrl); };
         audio.play().catch(() => setIsTestingVoice(false));
       } catch (error: any) {
-        addToast({ title: 'Voice Error', message: error.message || 'Gemini TTS failed.', type: 'error' });
+        const msg = error.message || 'Gemini TTS failed.';
+        console.error('[Gemini TTS test]', msg);
+        addToast({ title: 'Gemini TTS Error', message: msg, type: 'error' });
         setIsTestingVoice(false);
       }
     } else {
