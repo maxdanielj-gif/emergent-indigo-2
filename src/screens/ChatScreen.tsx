@@ -284,7 +284,7 @@ const ChatScreen: React.FC = () => {
           body: JSON.stringify({
             text,
             voiceName: aiProfile.geminiTtsVoice,
-            modelId: aiProfile.geminiTtsModel || 'gemini-2.5-flash-preview-tts',
+            modelId: aiProfile.geminiTtsModel || 'gemini-3.1-flash-tts-preview',
             stylePrompt: aiProfile.geminiTtsStyle || undefined,
             geminiKey: geminiApiKey || undefined,
           }),
@@ -295,7 +295,7 @@ const ChatScreen: React.FC = () => {
         const audio = new Audio(url);
         audio.onended = () => { onEnd(); URL.revokeObjectURL(url); };
         audio.onerror = () => { URL.revokeObjectURL(url); speakWithBrowser(text, messageId); };
-        audio.play();
+        audio.play().catch(() => speakWithBrowser(text, messageId));
       } catch (e: any) {
         addToast({ title: 'Gemini TTS failed', message: e.message || 'Falling back to browser voice.', type: 'error' });
         speakWithBrowser(text, messageId);

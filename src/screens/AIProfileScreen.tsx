@@ -170,8 +170,15 @@ const AIProfileScreen: React.FC = () => {
         const audioUrl = URL.createObjectURL(blob);
         const audio = new Audio(audioUrl);
         audio.onended = () => { setIsTestingVoice(false); URL.revokeObjectURL(audioUrl); };
-        audio.onerror = () => { setIsTestingVoice(false); URL.revokeObjectURL(audioUrl); };
-        audio.play().catch(() => setIsTestingVoice(false));
+        audio.onerror = () => {
+          setIsTestingVoice(false);
+          URL.revokeObjectURL(audioUrl);
+          addToast({ title: 'Gemini TTS Error', message: 'Audio could not be played. Check Render logs.', type: 'error' });
+        };
+        audio.play().catch((e: any) => {
+          setIsTestingVoice(false);
+          addToast({ title: 'Gemini TTS Error', message: e.message || 'Playback failed.', type: 'error' });
+        });
       } catch (error: any) {
         const msg = error.message || 'Gemini TTS failed.';
         console.error('[Gemini TTS test]', msg);
@@ -218,7 +225,7 @@ const AIProfileScreen: React.FC = () => {
     setVoiceDescription(aiProfile.voiceDescription || '');
     setVoiceProvider((aiProfile.voiceProvider === 'elevenlabs') ? 'elevenlabs' : (aiProfile.voiceProvider === 'gemini') ? 'gemini' : 'browser');
     setGeminiTtsVoice(aiProfile.geminiTtsVoice || 'Kore');
-    setGeminiTtsModel(aiProfile.geminiTtsModel || 'gemini-2.5-flash-preview-tts');
+    setGeminiTtsModel(aiProfile.geminiTtsModel || 'gemini-3.1-flash-tts-preview');
     setGeminiTtsStyle(aiProfile.geminiTtsStyle || '');
     setResponseLength(aiProfile.responseLength || 'medium');
     setResponseDetail(aiProfile.responseDetail || 'standard');
@@ -660,7 +667,7 @@ const AIProfileScreen: React.FC = () => {
   const [elevenLabsVoices, setElevenLabsVoices] = useState<any[]>([]);
   // Gemini TTS state
   const [geminiTtsVoice, setGeminiTtsVoice] = useState<string>(aiProfile.geminiTtsVoice || 'Kore');
-  const [geminiTtsModel, setGeminiTtsModel] = useState<string>(aiProfile.geminiTtsModel || 'gemini-2.5-flash-preview-tts');
+  const [geminiTtsModel, setGeminiTtsModel] = useState<string>(aiProfile.geminiTtsModel || 'gemini-3.1-flash-tts-preview');
   const [geminiTtsStyle, setGeminiTtsStyle] = useState<string>(aiProfile.geminiTtsStyle || '');
   const [isLoadingElevenLabsVoices, setIsLoadingElevenLabsVoices] = useState(false);
   const [elevenLabsVoiceId, setElevenLabsVoiceId] = useState<string>(aiProfile.asyncVoiceId || '');
@@ -1640,9 +1647,9 @@ const AIProfileScreen: React.FC = () => {
                                             onChange={e => setGeminiTtsModel(e.target.value)}
                                             className="w-full p-2 border border-indigo-300 dark:border-indigo-700 rounded-lg bg-white dark:bg-indigo-950 text-indigo-900 dark:text-indigo-100 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                                         >
-                                            <option value="gemini-2.5-flash-preview-tts">Gemini 2.5 Flash (Fast, efficient)</option>
-                                            <option value="gemini-2.5-pro-preview-tts">Gemini 2.5 Pro Preview (Highest quality)</option>
-                                            <option value="gemini-3.1-flash-tts-preview">Gemini 3.1 Flash (Latest)</option>
+                                            <option value="gemini-3.1-flash-tts-preview">Gemini 2.5 Flash (Fast, efficient)</option>
+                                            <option value="gemini-3.1-flash-tts-preview">Gemini 2.5 Pro Preview (Highest quality)</option>
+                                            
                                         </select>
                                     </div>
                                     {/* Voice */}
