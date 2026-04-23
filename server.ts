@@ -820,11 +820,13 @@ app.post("/api/tts/gemini", express.json(), async (req, res) => {
     let mimeType: string = part.inlineData.mimeType || "audio/wav";
     console.log(`Gemini TTS — response mimeType: ${mimeType}, bytes: ${audioBuffer.length}`);
 
-    // Raw PCM is not playable in a browser — wrap it in a WAV container
-    if (mimeType.includes("pcm") || mimeType === "audio/l16") {
+    // Raw PCM is not playable in a browser — wrap it in a WAV container.
+    // Gemini 3.1 returns audio/L16 (uppercase) so check case-insensitively.
+    const mimeTypeLower = mimeType.toLowerCase();
+    if (mimeTypeLower.includes("pcm") || mimeTypeLower.includes("l16")) {
       audioBuffer = pcmToWav(audioBuffer);
       mimeType = "audio/wav";
-      console.log("Gemini TTS — converted PCM to WAV");
+      console.log("Gemini TTS — converted L16/PCM to WAV");
     }
 
     res.setHeader("Content-Type", mimeType);
