@@ -752,32 +752,27 @@ app.post("/api/tts/gemini", express.json(), async (req, res) => {
   const apiKey = clientKey || process.env.GEMINI_API_KEY;
   if (!apiKey) return res.status(500).json({ error: "Gemini API key not configured. Add it in Settings." });
 
-  const model = modelId || "gemini-2.5-flash-tts";
+  const model = modelId || "gemini-3.1-flash-tts";
 
   try {
-    // TTS models crash with 500 if a system_instruction is provided.
-    // Fold the style prompt into the user message instead.
-    // Append an explicit audio intent phrase to prevent the server's intent
-    // check from treating the request as a text output (causes 500 errors).
-    const intentPhrase = "Please generate the audio for the text above.";
-    const userText = stylePrompt?.trim()
-      ? `${stylePrompt.trim()}\n\n${text}\n\n${intentPhrase}`
-      : `${text}\n\n${intentPhrase}`;
+    // TTS models use :generateSpeech (not :generateContent) with a different schema.
+    // Style prompt is folded into the input text — no system_instruction.
+    const inputText = stylePrompt?.trim()
+      ? `${stylePrompt.trim()}\n\n${text}`
+      : text;
 
     const requestBody: any = {
-      contents: [{ parts: [{ text: userText }] }],
-      generationConfig: {
-        response_modalities: ["AUDIO"],
-        speech_config: {
-          voice_config: {
-            prebuilt_voice_config: { voice_name: voiceName },
-          },
+      input: { text: inputText },
+      voice: {
+        voice_config: {
+          prebuilt_voice_config: { voice_name: voiceName },
         },
       },
+      audio_config: { audio_encoding: "MP3" },
     };
 
     const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateSpeech`,
       {
         method: "POST",
         headers: {
@@ -795,7 +790,10 @@ app.post("/api/tts/gemini", express.json(), async (req, res) => {
     }
 
     const data = await r.json();
-    const part = data.candidates?.[0]?.content?.parts?.[0];
+    // generateSpeech returns { audioContent: "<base64>" }
+    const part = data.audioContent
+      ? { inlineData: { data: data.audioContent, mimeType: "audio/mp3" } }
+      : data.candidates?.[0]?.content?.parts?.[0];
     if (!part?.inlineData?.data) {
       console.error("Gemini TTS: no audio in response", JSON.stringify(data).slice(0, 300));
       return res.status(500).json({ error: "Gemini TTS returned no audio data." });
