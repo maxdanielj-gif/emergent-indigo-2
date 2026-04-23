@@ -771,6 +771,8 @@ app.post("/api/tts/gemini", express.json(), async (req, res) => {
       audio_config: { audio_encoding: "MP3" },
     };
 
+    console.log(`Gemini TTS — model:${model}, voice:${voiceName}, textLen:${text.length}, hasStyle:${!!stylePrompt}`);
+
     const r = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateSpeech`,
       {
