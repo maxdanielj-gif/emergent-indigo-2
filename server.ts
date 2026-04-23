@@ -745,6 +745,27 @@ app.post("/api/chat", async (req, res) => {
 
 
 // ── Gemini TTS ────────────────────────────────────────────────────────────────
+// Wrap raw PCM audio in a WAV container so browsers can play it.
+// Gemini TTS returns audio/pcm (raw 16-bit 24kHz mono) which HTML Audio cannot play directly.
+function pcmToWav(pcmData: Buffer, sampleRate = 24000, channels = 1, bitsPerSample = 16): Buffer {
+  const dataSize = pcmData.length;
+  const header = Buffer.alloc(44);
+  header.write("RIFF", 0);
+  header.writeUInt32LE(36 + dataSize, 4);
+  header.write("WAVE", 8);
+  header.write("fmt ", 12);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20);
+  header.writeUInt16LE(channels, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(sampleRate * channels * (bitsPerSample / 8), 28);
+  header.writeUInt16LE(channels * (bitsPerSample / 8), 32);
+  header.writeUInt16LE(bitsPerSample, 34);
+  header.write("data", 36);
+  header.writeUInt32LE(dataSize, 40);
+  return Buffer.concat([header, pcmData]);
+}
+
 app.post("/api/tts/gemini", express.json(), async (req, res) => {
   const { text, voiceName, modelId, stylePrompt, geminiKey: clientKey } = req.body;
   if (!text || !voiceName) return res.status(400).json({ error: "Missing text or voiceName" });
@@ -752,11 +773,9 @@ app.post("/api/tts/gemini", express.json(), async (req, res) => {
   const apiKey = clientKey || process.env.GEMINI_API_KEY;
   if (!apiKey) return res.status(500).json({ error: "Gemini API key not configured. Add it in Settings." });
 
-  const model = modelId || "gemini-2.5-flash-preview-tts";
+  const model = modelId || "gemini-3.1-flash-tts-preview";
 
   try {
-    // Gemini TTS uses generateContent with response_modalities: ["AUDIO"].
-    // Style prompt is folded into the user message — system_instruction causes 500.
     const userText = stylePrompt?.trim()
       ? `${stylePrompt.trim()}\n\n${text}`
       : text;
@@ -773,16 +792,13 @@ app.post("/api/tts/gemini", express.json(), async (req, res) => {
       },
     };
 
-    console.log(`Gemini TTS — model:${model}, voice:${voiceName}, textLen:${text.length}, hasStyle:${!!stylePrompt}`);
+    console.log(`Gemini TTS — model:${model}, voice:${voiceName}, textLen:${text.length}`);
 
     const r = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
       {
         method: "POST",
-        headers: {
-          "x-goog-api-key": apiKey,
-          "Content-Type": "application/json",
-        },
+        headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),
       }
     );
@@ -794,16 +810,23 @@ app.post("/api/tts/gemini", express.json(), async (req, res) => {
     }
 
     const data = await r.json();
-    console.log("Gemini TTS raw response keys:", Object.keys(data));
-    // generateContent returns audio inline in candidates[0].content.parts
     const part = data.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
     if (!part?.inlineData?.data) {
-      console.error("Gemini TTS: no audio in response", JSON.stringify(data).slice(0, 300));
+      console.error("Gemini TTS: no audio in response", JSON.stringify(data).slice(0, 400));
       return res.status(500).json({ error: "Gemini TTS returned no audio data." });
     }
 
-    const audioBuffer = Buffer.from(part.inlineData.data, "base64");
-    const mimeType = part.inlineData.mimeType || "audio/mp3";
+    let audioBuffer = Buffer.from(part.inlineData.data, "base64");
+    let mimeType: string = part.inlineData.mimeType || "audio/wav";
+    console.log(`Gemini TTS — response mimeType: ${mimeType}, bytes: ${audioBuffer.length}`);
+
+    // Raw PCM is not playable in a browser — wrap it in a WAV container
+    if (mimeType.includes("pcm") || mimeType === "audio/l16") {
+      audioBuffer = pcmToWav(audioBuffer);
+      mimeType = "audio/wav";
+      console.log("Gemini TTS — converted PCM to WAV");
+    }
+
     res.setHeader("Content-Type", mimeType);
     res.send(audioBuffer);
   } catch (e: any) {
