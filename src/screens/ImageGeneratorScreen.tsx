@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import {
-  Download, RefreshCw, X, Wand2, Upload
+  Download, RefreshCw, X, Wand2, Upload, Cpu
 } from 'lucide-react';
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -89,6 +90,7 @@ function Slider({ label, value, min, max, onChange }: {
 // ── Main component ────────────────────────────────────────────────────────────
 
 const ImageGeneratorScreen: React.FC = () => {
+  const navigate = useNavigate();
   const { wavespeedApiKey, aiProfile, addToGallery, addToast } = useApp();
   const hasRef = !!aiProfile.referenceImage;
 
@@ -314,6 +316,15 @@ const ImageGeneratorScreen: React.FC = () => {
         <h2 className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">Image Generator</h2>
         <p className="text-xs text-indigo-400 dark:text-indigo-500 mt-0.5">Powered by WaveSpeed AI</p>
       </div>
+
+      {/* Gemini Image Generator link */}
+      <button
+        onClick={() => navigate('/gemini-image')}
+        className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl border border-indigo-300 dark:border-indigo-700 text-indigo-600 dark:text-indigo-400 text-sm font-medium hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors"
+      >
+        <Cpu className="w-4 h-4" />
+        Switch to Gemini Image Generation
+      </button>
 
       {/* Model selector */}
       <div>
