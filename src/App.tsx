@@ -11,6 +11,7 @@ import UserProfileScreen from './screens/UserProfileScreen';
 import MemoryScreen from './screens/MemoryScreen';
 import GalleryScreen from './screens/GalleryScreen';
 import ImageGeneratorScreen from './screens/ImageGeneratorScreen';
+import GeminiImageScreen from './screens/GeminiImageScreen';
 import JournalScreen from './screens/JournalScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import LoginScreen, { SKIP_AUTH_KEY } from './screens/LoginScreen';
@@ -79,6 +80,7 @@ const App: React.FC = () => {
                   <Route path="/memory" element={<MemoryScreen />} />
                   <Route path="/gallery" element={<GalleryScreen />} />
                   <Route path="/image-generator" element={<ImageGeneratorScreen />} />
+                  <Route path="/gemini-image" element={<GeminiImageScreen />} />
                   <Route path="/journal" element={<JournalScreen />} />
                   <Route path="/settings" element={<SettingsScreen />} />
                   <Route path="*" element={<Navigate to="/chat" replace />} />
