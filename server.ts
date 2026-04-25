@@ -837,6 +837,89 @@ app.post("/api/tts/gemini", express.json(), async (req, res) => {
   }
 });
 
+
+// ── Gemini Image Generation ───────────────────────────────────────────────────
+app.post("/api/gemini/generate-image", express.json({ limit: "20mb" }), async (req, res) => {
+  const { prompt, modelId, aspectRatio, imageSize, referenceImages, geminiKey: clientKey } = req.body;
+  if (!prompt?.trim()) return res.status(400).json({ error: "Prompt is required." });
+
+  const apiKey = clientKey || process.env.GEMINI_API_KEY;
+  if (!apiKey) return res.status(400).json({ error: "Gemini API key not configured. Add it in Settings." });
+
+  const model = modelId || "gemini-3.1-flash-image-preview";
+
+  try {
+    // Build parts — optional reference images first, then the text prompt
+    const parts: any[] = [];
+    if (Array.isArray(referenceImages) && referenceImages.length > 0) {
+      for (const img of referenceImages.filter(Boolean)) {
+        // img is a data URL: "data:image/png;base64,<data>"
+        const match = img.match(/^data:(image\/[^;]+);base64,(.+)$/);
+        if (match) {
+          parts.push({ inline_data: { mime_type: match[1], data: match[2] } });
+        }
+      }
+    }
+    parts.push({ text: prompt.trim() });
+
+    const generationConfig: any = {
+      responseModalities: ["TEXT", "IMAGE"],
+    };
+    if (aspectRatio || imageSize) {
+      generationConfig.imageConfig = {};
+      if (aspectRatio) generationConfig.imageConfig.aspectRatio = aspectRatio;
+      if (imageSize)   generationConfig.imageConfig.imageSize   = imageSize;
+    }
+
+    const requestBody = {
+      contents: [{ parts }],
+      generationConfig,
+    };
+
+    console.log(`Gemini Image — model:${model}, aspectRatio:${aspectRatio || "default"}, imageSize:${imageSize || "default"}, refs:${parts.length - 1}`);
+
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      {
+        method: "POST",
+        headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      }
+    );
+
+    if (!r.ok) {
+      const errText = await r.text();
+      console.error(`Gemini Image error ${r.status}:`, errText);
+      return res.status(r.status).json({ error: `Gemini Image error: ${errText}` });
+    }
+
+    const data = await r.json();
+    const parts_out = data.candidates?.[0]?.content?.parts ?? [];
+
+    // Extract all image parts and any text commentary
+    const images: string[] = [];
+    const textParts: string[] = [];
+    for (const part of parts_out) {
+      if (part.inlineData?.data) {
+        const mimeType = part.inlineData.mimeType || "image/png";
+        images.push(`data:${mimeType};base64,${part.inlineData.data}`);
+      } else if (part.text) {
+        textParts.push(part.text);
+      }
+    }
+
+    if (images.length === 0) {
+      console.error("Gemini Image: no images in response", JSON.stringify(data).slice(0, 400));
+      return res.status(500).json({ error: "Gemini returned no images. The prompt may have been blocked by safety filters." });
+    }
+
+    res.json({ images, text: textParts.join("\n").trim() || null });
+  } catch (e: any) {
+    console.error("Gemini Image error:", e);
+    res.status(500).json({ error: e.message || "Failed to generate image with Gemini." });
+  }
+});
+
 // ── Api.Airforce: fetch available text/chat models ────────────────────────────
 const AIRFORCE_BASE = "https://api.airforce";
 
