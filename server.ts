@@ -93,11 +93,15 @@ async function callGeminiChat(
     parts: [{ text: typeof m.content === "string" ? m.content : JSON.stringify(m.content) }],
   }));
 
-  const body = {
-    system_instruction: { parts: [{ text: systemPrompt }] },
+  const body: any = {
     contents,
     generationConfig: { temperature: temperature ?? 0.7, maxOutputTokens: 2048 },
   };
+  // Only include system_instruction when there's actual content —
+  // Gemini rejects requests with an empty system_instruction object.
+  if (systemPrompt) {
+    body.system_instruction = { parts: [{ text: systemPrompt }] };
+  }
 
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
@@ -1079,7 +1083,12 @@ async function callActiveProvider(
   maxTokens: number,
 ): Promise<string> {
   const provider = aiProfile.llmProvider || 'claude';
-  const model = aiProfile.model || 'claude-haiku-4-5-20251001';
+  // Always pick a model that belongs to the active provider — avoids passing
+  // a Claude model string to the Gemini API (or vice versa) when the profile
+  // model field is missing or stale.
+  const model = provider === 'gemini'
+    ? (isGeminiModel(aiProfile.model) ? aiProfile.model : 'gemini-2.0-flash')
+    : (aiProfile.model || 'claude-haiku-4-5-20251001');
 
   // ── Gemini ───────────────────────────────────────────────────────────────
   if (provider === 'gemini' || isGeminiModel(model)) {
