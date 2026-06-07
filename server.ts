@@ -1266,7 +1266,19 @@ ${(existingMemories || []).map((m: any) => m.content).join("; ")}
 If something new and useful comes up, write it as a single concise sentence from your perspective as ${aiProfile.name} (e.g. "${userProfile.name} mentioned they work as a nurse" or "${userProfile.name} loves horror films but hates gore"). If nothing new was shared, write exactly NOTHING.`;
 
     const text = await callActiveProvider(prompt, aiProfile, { anthropicKey, geminiKey }, 100);
-    res.json({ memory: !text || text === "NOTHING" || text.includes("NOTHING") ? null : text });
+    const t = (text || "").trim().toLowerCase();
+    const isNothing = !t
+      || t === "nothing"
+      || t.startsWith("nothing.")
+      || t.startsWith("nothing ")
+      || t.startsWith("no new")
+      || t.startsWith("no information")
+      || t.startsWith("there is nothing")
+      || t.startsWith("there's nothing")
+      || t.startsWith("there are no")
+      || t.includes("nothing new")
+      || t.includes("nothing worth");
+    res.json({ memory: isNothing ? null : text });
   } catch (e: any) {
     console.error("Memory extract error:", e.message);
     res.status(500).json({ error: "Failed to extract memory." });
