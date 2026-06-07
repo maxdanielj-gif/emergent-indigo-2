@@ -510,8 +510,21 @@ const ChatScreen: React.FC = () => {
             isImportant: false,
           });
         }
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        addToast({
+          title: "Memory save failed",
+          message: errData.error || `Server error ${res.status}`,
+          type: "error",
+        });
       }
-    } catch (e) { console.error("Memory extraction error:", e); }
+    } catch (e: any) {
+      addToast({
+        title: "Memory save failed",
+        message: e?.message || "Could not reach the server.",
+        type: "error",
+      });
+    }
   };
 
   const handleRegenerate = async (messageId?: string) => {
