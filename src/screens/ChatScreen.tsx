@@ -22,7 +22,7 @@ const ChatScreen: React.FC = () => {
   const {
     chatHistory, addChatMessage, updateChatMessage, 
     deleteChatMessage, rateChatMessage, addFeedbackComment, setChatHistory, clearHistory,
-    sessions, activeSessionId, createNewSession, switchSession, deleteSession, deleteAllSessions, renameSession
+    sessions, setSessions, activeSessionId, createNewSession, switchSession, deleteSession, deleteAllSessions, renameSession
   } = useChat();
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -530,6 +530,10 @@ const ChatScreen: React.FC = () => {
              // The new state should include the user message
              const historyToKeep = newHistory.slice(0, index);
              setChatHistory(historyToKeep);
+             setSessions(prev => prev.map(s => s.id === activeSessionId
+               ? { ...s, messages: historyToKeep, updatedAt: Date.now() }
+               : s
+             ));
              
              // History for generation should NOT include the target user message (it's passed as current)
              historyForGen = newHistory.slice(0, index - 1);
@@ -544,6 +548,10 @@ const ChatScreen: React.FC = () => {
         targetUserMsg = newHistory[newHistory.length - 1];
         historyForGen = newHistory.slice(0, -1);
         setChatHistory(newHistory);
+        setSessions(prev => prev.map(s => s.id === activeSessionId
+          ? { ...s, messages: newHistory, updatedAt: Date.now() }
+          : s
+        ));
     }
 
     if (!targetUserMsg || targetUserMsg.role !== 'user') return;
@@ -575,6 +583,10 @@ const ChatScreen: React.FC = () => {
             
             // Update state
             setChatHistory(newHistory);
+            setSessions(prev => prev.map(s => s.id === activeSessionId
+              ? { ...s, messages: newHistory, updatedAt: Date.now() }
+              : s
+            ));
             setEditingMessageId(null);
 
             // Regenerate from the edited message forward
