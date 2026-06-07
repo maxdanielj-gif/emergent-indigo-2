@@ -624,47 +624,6 @@ app.post("/api/chat", async (req, res) => {
   const selectedModel = aiProfile.model || "claude-sonnet-4-6";
   const useGemini = isGeminiModel(selectedModel);
 
-  // ── api.airforce path ────────────────────────────────────────────────────
-  const useAirforce = aiProfile.llmProvider === 'airforce';
-  if (useAirforce) {
-    const airforceKey = req.body.airforceKey || process.env.AIRFORCE_API_KEY;
-    if (!airforceKey) {
-      return res.status(400).json({ error: "api.airforce API key not configured. Add it in Settings." });
-    }
-    try {
-      const airforceMessages = [
-        { role: "system", content: systemPrompt },
-        ...messages.map((m: any) => ({
-          role: m.role === "model" ? "assistant" : "user",
-          content: m.content,
-        })),
-      ];
-      const r = await fetch(`${AIRFORCE_BASE}/v1/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${airforceKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: selectedModel,
-          messages: airforceMessages,
-          max_tokens: aiProfile.maxTokens ?? 2048,
-          temperature: aiProfile.temperature ?? 0.7,
-        }),
-      });
-      if (!r.ok) {
-        const errText = await r.text();
-        throw new Error(`api.airforce error (${r.status}): ${errText}`);
-      }
-      const data = await r.json();
-      const text = data.choices?.[0]?.message?.content || "";
-      return res.json({ content: text, provider: "airforce" });
-    } catch (e: any) {
-      console.error("api.airforce chat error:", e.message);
-      return res.status(500).json({ error: e.message || "api.airforce request failed." });
-    }
-  }
-
   // ── Gemini path ───────────────────────────────────────────────────────────
   if (useGemini) {
     try {
@@ -920,47 +879,6 @@ app.post("/api/gemini/generate-image", express.json({ limit: "20mb" }), async (r
   }
 });
 
-// ── Api.Airforce: fetch available text/chat models ────────────────────────────
-const AIRFORCE_BASE = "https://api.airforce";
-
-// Keywords that identify non-text models (image, video, audio) — filter these out
-const AIRFORCE_NON_TEXT_KEYWORDS = [
-  "flux", "sdxl", "dall-e", "dall_e", "imagen", "midjourney", "imagine",
-  "video", "veo", "suno", "audio", "whisper", "kandinsky", "stable-diffusion",
-  "stablediffusion", "rtist", "midijourney", "turbo-image", "art-",
-  "nano-banana", "nano_banana", "nanobana",
-  "paint", "draw", "sketch", "diffusion", "generate-image", "image-gen",
-  "img2img", "text2img", "txt2img", "inpaint",
-];
-
-function isAirforceTextModel(id: string): boolean {
-  const lower = id.toLowerCase();
-  return !AIRFORCE_NON_TEXT_KEYWORDS.some(kw => lower.includes(kw));
-}
-
-app.get("/api/airforce/models", async (req, res) => {
-  const apiKey = (req.query.api_key as string) || process.env.AIRFORCE_API_KEY;
-  if (!apiKey) return res.status(400).json({ error: "api.airforce API key required." });
-
-  try {
-    const r = await fetch(`${AIRFORCE_BASE}/v1/models`, {
-      headers: { "Authorization": `Bearer ${apiKey}` },
-    });
-    if (!r.ok) {
-      const errText = await r.text();
-      return res.status(r.status).json({ error: `api.airforce error: ${errText}` });
-    }
-    const data = await r.json();
-    const allModels: string[] = Array.isArray(data.data)
-      ? data.data.map((m: any) => m.id).filter(Boolean)
-      : [];
-    const textModels = allModels.filter(isAirforceTextModel).sort();
-    res.json({ models: textModels });
-  } catch (e: any) {
-    res.status(500).json({ error: e.message || "Failed to fetch models from api.airforce." });
-  }
-});
-
 // ── WaveSpeed AI: image editing ──────────────────────────────────────────────
 // Unified REST API: POST to submit, GET to poll results.
 // Auth: Authorization: Bearer {WAVESPEED_API_KEY}
@@ -1157,30 +1075,11 @@ Return ONLY a valid JSON object with updated "personality" and/or "backstory" st
 async function callActiveProvider(
   prompt: string,
   aiProfile: any,
-  keys: { anthropicKey?: string; geminiKey?: string; airforceKey?: string },
+  keys: { anthropicKey?: string; geminiKey?: string },
   maxTokens: number,
 ): Promise<string> {
   const provider = aiProfile.llmProvider || 'claude';
   const model = aiProfile.model || 'claude-haiku-4-5-20251001';
-
-  // ── api.airforce ─────────────────────────────────────────────────────────
-  if (provider === 'airforce') {
-    const apiKey = keys.airforceKey || process.env.AIRFORCE_API_KEY;
-    if (!apiKey) throw new Error('api.airforce API key not configured.');
-    const r = await fetch(`${AIRFORCE_BASE}/v1/chat/completions`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: maxTokens,
-        temperature: 0.7,
-      }),
-    });
-    if (!r.ok) throw new Error(`api.airforce error (${r.status}): ${await r.text()}`);
-    const data = await r.json();
-    return data.choices?.[0]?.message?.content?.trim() || '';
-  }
 
   // ── Gemini ───────────────────────────────────────────────────────────────
   if (provider === 'gemini' || isGeminiModel(model)) {
@@ -1198,7 +1097,7 @@ async function callActiveProvider(
 }
 
 app.post("/api/journal-reflection", async (req, res) => {
-  const { userMsg, aiMsg, aiProfile, userProfile, anthropicKey, geminiKey, airforceKey, timeZone } = req.body;
+  const { userMsg, aiMsg, aiProfile, userProfile, anthropicKey, geminiKey, timeZone } = req.body;
   try {
     const today = new Date().toLocaleDateString("en-US", { timeZone: timeZone || "UTC" });
     const personaNote = !aiProfile.knowsItsAI ? " Do not call yourself an AI." : "";
@@ -1210,7 +1109,7 @@ You responded: ${aiMsg}
 
 Journal entry:`;
 
-    const text = await callActiveProvider(prompt, aiProfile, { anthropicKey, geminiKey, airforceKey }, 200);
+    const text = await callActiveProvider(prompt, aiProfile, { anthropicKey, geminiKey }, 200);
     res.json({ content: text });
   } catch (e: any) {
     console.error("Journal reflection error:", e.message);
@@ -1220,7 +1119,7 @@ Journal entry:`;
 
 // ── Claude AI: memory extraction ──────────────────────────────────────────────
 app.post("/api/memory-extract", async (req, res) => {
-  const { userMsg, aiMsg, aiProfile, userProfile, existingMemories, anthropicKey, geminiKey, airforceKey } = req.body;
+  const { userMsg, aiMsg, aiProfile, userProfile, existingMemories, anthropicKey, geminiKey } = req.body;
   try {
     const personaNote = !aiProfile.knowsItsAI
       ? `You are ${aiProfile.name} — never refer to yourself as an AI, a language model, or a bot.`
@@ -1238,7 +1137,7 @@ ${(existingMemories || []).map((m: any) => m.content).join("; ")}
 
 If there is a new fact worth remembering, write it as a single concise sentence in the first person from your perspective as ${aiProfile.name} (e.g. "I know that ${userProfile.name} loves hiking" or "${userProfile.name} told me their favourite colour is blue"). Otherwise write exactly NOTHING.`;
 
-    const text = await callActiveProvider(prompt, aiProfile, { anthropicKey, geminiKey, airforceKey }, 100);
+    const text = await callActiveProvider(prompt, aiProfile, { anthropicKey, geminiKey }, 100);
     res.json({ memory: !text || text === "NOTHING" || text.includes("NOTHING") ? null : text });
   } catch (e: any) {
     console.error("Memory extract error:", e.message);
