@@ -117,8 +117,95 @@ async function callGeminiChat(
   return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
 }
 
+// ── Knowledge base relevance injection ───────────────────────────────────────
+const STOP_WORDS = new Set([
+  "the","a","an","and","or","but","in","on","at","to","for","of","with","by",
+  "from","is","are","was","were","be","been","have","has","had","do","does",
+  "did","will","would","could","should","may","might","can","not","this","that",
+  "these","those","what","which","who","when","where","why","how","all","some",
+  "any","just","about","more","also","than","then","very","so","if","as","i",
+  "you","he","she","it","we","they","me","him","her","us","them","my","your",
+  "his","its","our","their","there","here","up","out","into","over","after",
+]);
+
+function extractKeywords(text: string): string[] {
+  return text.toLowerCase().split(/\W+/).filter(w => w.length > 3 && !STOP_WORDS.has(w));
+}
+
+function getRelevantExcerpt(content: string, keywords: string[], maxLength: number): string {
+  if (keywords.length === 0) {
+    // No keywords — show the end of the document (most recent content for chat logs)
+    if (content.length <= maxLength) return content;
+    return "…" + content.slice(-maxLength);
+  }
+  // Find the position of the first keyword match
+  const lower = content.toLowerCase();
+  let bestPos = -1;
+  for (const kw of keywords) {
+    const pos = lower.indexOf(kw);
+    if (pos !== -1 && (bestPos === -1 || pos < bestPos)) bestPos = pos;
+  }
+  if (bestPos === -1) {
+    // Keywords not found — show most recent section
+    if (content.length <= maxLength) return content;
+    return "…" + content.slice(-maxLength);
+  }
+  // Show context window around the match
+  const start = Math.max(0, bestPos - 150);
+  const end = Math.min(content.length, start + maxLength);
+  return (start > 0 ? "…" : "") + content.slice(start, end) + (end < content.length ? "…" : "");
+}
+
+function buildKBContext(knowledgeBase: any[], currentUserMessage: string): string {
+  if (!knowledgeBase || knowledgeBase.length === 0) return "";
+
+  const keywords = extractKeywords(currentUserMessage || "");
+  const MAX_TOTAL_CHARS = 4000;
+  const MAX_DOCS = 6;
+
+  // Score each document by keyword match count
+  const scored = knowledgeBase.map(doc => ({
+    ...doc,
+    score: keywords.filter(kw => (doc.content || "").toLowerCase().includes(kw)).length,
+  }));
+
+  // Sort: highest relevance score first; for ties, smaller docs first
+  scored.sort((a, b) => b.score - a.score || a.content.length - b.content.length);
+
+  const included: string[] = [];
+  const tooLargeToShow: string[] = [];
+  let totalChars = 0;
+
+  for (const doc of scored.slice(0, MAX_DOCS)) {
+    if (totalChars >= MAX_TOTAL_CHARS) {
+      tooLargeToShow.push(doc.name);
+      continue;
+    }
+    const remaining = MAX_TOTAL_CHARS - totalChars;
+    if (doc.content.length <= remaining) {
+      included.push(`[Document: "${doc.name}"]\n${doc.content}`);
+      totalChars += doc.content.length;
+    } else {
+      // Document is larger than available space — show relevant excerpt
+      const excerpt = getRelevantExcerpt(doc.content, keywords, remaining - 60);
+      included.push(`[Document: "${doc.name}" — excerpt of ${doc.content.length.toLocaleString()} total characters]\n${excerpt}`);
+      totalChars += excerpt.length;
+    }
+  }
+
+  // List names of any documents that didn't fit so the AI knows they exist
+  const overflow = scored.slice(MAX_DOCS).map(d => d.name);
+  const allNotShown = [...tooLargeToShow, ...overflow];
+
+  let result = "\n\nKnowledge base documents:\n" + included.join("\n\n");
+  if (allNotShown.length > 0) {
+    result += `\n\n[Additional documents stored but not shown: ${allNotShown.map(n => `"${n}"`).join(", ")}]`;
+  }
+  return result;
+}
+
 // ── Build persona system prompt ───────────────────────────────────────────────
-function buildSystemPrompt(aiProfile: any, userProfile: any, timeZone?: string, memories?: any[], journal?: any[]): string {
+function buildSystemPrompt(aiProfile: any, userProfile: any, timeZone?: string, memories?: any[], journal?: any[], knowledgeBase?: any[], currentUserMessage?: string): string {
   const now = new Date();
   const timeContext = aiProfile.timeAwareness
     ? `\n\nCurrent time: ${now.toLocaleString("en-US", { timeZone: timeZone || "UTC", weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })}`
@@ -162,6 +249,9 @@ function buildSystemPrompt(aiProfile: any, userProfile: any, timeZone?: string, 
       })()
     : "";
 
+  // Knowledge base — inject relevant documents scored against the current message
+  const kbContext = buildKBContext(knowledgeBase || [], currentUserMessage || "");
+
   const parts = [
     `You are ${aiProfile.name}.`,
     `Personality: ${aiProfile.personality}.`,
@@ -178,6 +268,7 @@ function buildSystemPrompt(aiProfile: any, userProfile: any, timeZone?: string, 
     timeContext,
     memoriesContext,
     journalContext,
+    kbContext,
     lengthGuidance,
     toneGuidance,
     personaGuidance,
@@ -642,12 +733,17 @@ app.get("/api/sync/:userId?", (req, res) => {
 
 // ── Claude AI: main chat ──────────────────────────────────────────────────────
 app.post("/api/chat", async (req, res) => {
-  const { messages, aiProfile, userProfile, anthropicKey: clientKey, geminiKey, timeZone, attachments, memories, journal } = req.body;
+  const { messages, aiProfile, userProfile, anthropicKey: clientKey, geminiKey, timeZone, attachments, memories, journal, knowledgeBase } = req.body;
   if (!aiProfile || !userProfile) {
     return res.status(400).json({ error: "AI Profile and User Profile are required." });
   }
 
-  const systemPrompt = buildSystemPrompt(aiProfile, userProfile, timeZone, memories, journal);
+  // Last message is the current user turn — used for KB relevance scoring
+  const currentUserMessage = Array.isArray(messages) && messages.length > 0
+    ? (messages[messages.length - 1].content || "")
+    : "";
+
+  const systemPrompt = buildSystemPrompt(aiProfile, userProfile, timeZone, memories, journal, knowledgeBase, currentUserMessage);
   const selectedModel = aiProfile.model || "claude-sonnet-4-6";
   const useGemini = isGeminiModel(selectedModel);
 
@@ -1174,6 +1270,53 @@ If something new and useful comes up, write it as a single concise sentence from
   } catch (e: any) {
     console.error("Memory extract error:", e.message);
     res.status(500).json({ error: "Failed to extract memory." });
+  }
+});
+
+// ── Conversation summarizer ───────────────────────────────────────────────────
+app.post("/api/summarize-chat", async (req, res) => {
+  const { messages, sessionTitle, aiProfile, userProfile, anthropicKey, geminiKey, timeZone } = req.body;
+  try {
+    const date = new Date().toLocaleDateString("en-US", {
+      timeZone: timeZone || "UTC", weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+
+    const transcript = (messages || []).map((m: any) => {
+      const speaker = m.role === 'user' ? userProfile.name : aiProfile.name;
+      return `${speaker}: ${m.content}`;
+    }).join('\n\n');
+
+    const prompt = `You are creating a structured reference summary of a conversation between ${userProfile.name} and ${aiProfile.name} that took place on ${date}.
+
+This summary will be stored in a knowledge base and referenced in future conversations to help maintain continuity. Write it as a compact, scannable reference document — not a narrative recap. Focus on what would genuinely be useful to remember later.
+
+CONVERSATION TRANSCRIPT:
+${transcript}
+
+Write the summary using exactly this structure:
+
+# Conversation Summary — ${sessionTitle || 'Chat'} (${date})
+
+## Topics Discussed
+[3-5 bullet points covering the main subjects of the conversation]
+
+## About ${userProfile.name}
+[Bullet points: any personal facts, preferences, opinions, or experiences they shared. Omit if nothing meaningful was shared.]
+
+## Key Points & Conclusions
+[Bullet points: decisions made, questions answered, plans formed, or anything that was resolved. Omit if nothing concrete was concluded.]
+
+## Carry Forward
+[1-3 sentences: the overall context, tone, and anything especially important to remember for next time]
+
+Be concise. Skip pleasantries and small talk. Write only what future conversations would benefit from knowing.`;
+
+    const text = await callActiveProvider(prompt, aiProfile, { anthropicKey, geminiKey }, 800);
+    if (!text) return res.status(204).send();
+    res.json({ summary: text });
+  } catch (e: any) {
+    console.error("Summarize error:", e.message);
+    res.status(500).json({ error: "Failed to generate summary." });
   }
 });
 
