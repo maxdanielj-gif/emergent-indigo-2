@@ -409,6 +409,7 @@ const ChatScreen: React.FC = () => {
           timeZone,
           memories: memories.length > 0 ? memories : undefined,
           journal: journal.length > 0 ? journal.slice(-3) : undefined,
+          knowledgeBase: knowledgeBase.length > 0 ? knowledgeBase : undefined,
         }),
       });
 
@@ -608,6 +609,50 @@ const ChatScreen: React.FC = () => {
       addToast({ title: "Chat", message: "Deleting message...", type: "info" });
       await new Promise(resolve => setTimeout(resolve, 500));
       deleteChatMessage(id);
+    }
+  };
+
+  const handleSummarizeChat = async () => {
+    if (!chatHistory || chatHistory.length === 0) {
+      addToast({ title: "Nothing to summarize", message: "This chat is empty.", type: "info" });
+      setIsMenuOpen(false);
+      return;
+    }
+    setIsMenuOpen(false);
+    addToast({ title: "Summarizing…", message: "Generating summary, this may take a moment.", type: "info" });
+
+    try {
+      const activeSession = sessions.find(s => s.id === activeSessionId);
+      const sessionTitle = activeSession?.title || "Chat";
+
+      const res = await fetch('/api/summarize-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: chatHistory.map(m => ({ role: m.role, content: m.content })),
+          sessionTitle,
+          aiProfile,
+          userProfile,
+          timeZone,
+          anthropicKey: anthropicApiKey || undefined,
+          geminiKey: geminiApiKey || undefined,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Server returned an error");
+      const { summary } = await res.json();
+      if (!summary) throw new Error("Empty summary returned");
+
+      const date = new Date().toLocaleDateString("en-US", { month: 'short', day: 'numeric', year: 'numeric' });
+      addToKnowledgeBase({
+        name: `Summary: ${sessionTitle} — ${date}`,
+        content: summary,
+      });
+
+      addToast({ title: "Summary saved", message: "Added to Knowledge Base.", type: "success" });
+    } catch (e) {
+      console.error("Summary error:", e);
+      addToast({ title: "Summary failed", message: "Could not generate summary. Try again.", type: "error" });
     }
   };
 
@@ -875,6 +920,13 @@ const ChatScreen: React.FC = () => {
                     >
                         <Download className="w-5 h-5 text-indigo-500 flex-shrink-0" />
                         Download Chat Log
+                    </button>
+                    <button
+                        onClick={handleSummarizeChat}
+                        className="w-full px-6 py-4 text-left text-base font-medium text-indigo-900 dark:text-indigo-100 hover:bg-indigo-50 dark:hover:bg-indigo-800 flex items-center gap-4 transition-colors"
+                    >
+                        <FileText className="w-5 h-5 text-indigo-500 flex-shrink-0" />
+                        Summarize to Knowledge Base
                     </button>
                     <button
                         onClick={() => { setIsMenuOpen(false); handleClear(); }}
