@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Send, Image as ImageIcon, Mic, Paperclip, Volume2, RotateCcw, Edit2, X, FileText, CheckCheck, Loader2, Camera, Trash2, ExternalLink, Plus, MessageSquare, History, MoreVertical, ChevronLeft, ChevronRight, Search, Star, Headphones, ArrowDown} from 'lucide-react';
+import { Send, Image as ImageIcon, Mic, Paperclip, Volume2, RotateCcw, Edit2, X, FileText, CheckCheck, Loader2, Camera, Trash2, ExternalLink, Plus, MessageSquare, History, MoreVertical, ChevronLeft, ChevronRight, Search, Star, Headphones, ArrowDown, Download } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useChat } from '../context/ChatContext';
 import { generateElevenLabsSpeech } from '../services/asyncService';
@@ -597,6 +597,66 @@ const ChatScreen: React.FC = () => {
     }
   };
 
+  const handleDownloadChat = () => {
+    if (!chatHistory || chatHistory.length === 0) {
+      addToast({ title: "Nothing to download", message: "This chat is empty.", type: "info" });
+      setIsMenuOpen(false);
+      return;
+    }
+
+    const activeSession = sessions.find(s => s.id === activeSessionId);
+    const sessionTitle = activeSession?.title || "Chat";
+    const exportDate = new Date().toLocaleString("en-US", {
+      timeZone: timeZone || "UTC",
+      weekday: 'long', year: 'numeric', month: 'long',
+      day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short'
+    });
+
+    const lines: string[] = [
+      `Chat Log — ${sessionTitle}`,
+      `Exported: ${exportDate}`,
+      '='.repeat(60),
+      '',
+    ];
+
+    chatHistory.forEach(msg => {
+      const speaker = msg.role === 'user' ? (userProfile.name || 'You') : aiProfile.name;
+      const time = new Date(msg.timestamp).toLocaleTimeString("en-US", {
+        timeZone: timeZone || "UTC",
+        hour: 'numeric', minute: '2-digit'
+      });
+      lines.push(`[${time}] ${speaker}:`);
+      lines.push(msg.content);
+      if (msg.attachments && msg.attachments.length > 0) {
+        msg.attachments.forEach(att => {
+          if (att.type === 'image') lines.push(`[Image attached: ${att.name}]`);
+          else lines.push(`[File attached: ${att.name}]`);
+        });
+      }
+      if (msg.groundingUrls && msg.groundingUrls.length > 0) {
+        lines.push('Sources:');
+        msg.groundingUrls.forEach(g => lines.push(`  • ${g.title}: ${g.url}`));
+      }
+      lines.push('');
+    });
+
+    const text = lines.join('\n');
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const safeTitle = sessionTitle.replace(/[^a-z0-9\-_ ]/gi, '').replace(/\s+/g, '_').slice(0, 40) || 'chat';
+    const dateStr = new Date().toISOString().slice(0, 10);
+    a.download = `${safeTitle}_${dateStr}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    setIsMenuOpen(false);
+    addToast({ title: "Downloaded", message: `${chatHistory.length} messages saved.`, type: "success" });
+  };
+
   const handleClear = async () => {
     if (window.confirm("Are you sure you want to clear the chat history for this session?")) {
         addToast({ title: "Chat", message: "Clearing conversation history...", type: "info" });
@@ -795,6 +855,13 @@ const ChatScreen: React.FC = () => {
                 {/* Sheet */}
                 <div className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-indigo-900 rounded-t-2xl shadow-2xl border-t border-indigo-200 dark:border-indigo-700 pb-safe">
                     <div className="w-12 h-1 bg-indigo-200 dark:bg-indigo-700 rounded-full mx-auto mt-3 mb-4" />
+                    <button
+                        onClick={handleDownloadChat}
+                        className="w-full px-6 py-4 text-left text-base font-medium text-indigo-900 dark:text-indigo-100 hover:bg-indigo-50 dark:hover:bg-indigo-800 flex items-center gap-4 transition-colors"
+                    >
+                        <Download className="w-5 h-5 text-indigo-500 flex-shrink-0" />
+                        Download Chat Log
+                    </button>
                     <button
                         onClick={() => { setIsMenuOpen(false); handleClear(); }}
                         className="w-full px-6 py-4 text-left text-base font-medium text-indigo-900 dark:text-indigo-100 hover:bg-indigo-50 dark:hover:bg-indigo-800 flex items-center gap-4 transition-colors"
