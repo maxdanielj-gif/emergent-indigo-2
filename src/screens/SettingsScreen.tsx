@@ -29,7 +29,6 @@ const SettingsScreen: React.FC = () => {
     firebaseBackup, firebaseRestore, firebaseGalleryBackup, firebaseGalleryRestore,
     firebaseKBBackup, firebaseKBRestore,
     wavespeedApiKey, setWavespeedApiKey,
-    airforceApiKey, setAirforceApiKey,
     firebaseApiKey, firebaseAuthDomain, firebaseProjectId,
     firebaseStorageBucket, firebaseMessagingSenderId, firebaseAppId,
     setFirebaseConfig,
@@ -51,7 +50,6 @@ const SettingsScreen: React.FC = () => {
   const [localElevenLabsApiKey,   setLocalElevenLabsApiKey]   = useState(elevenLabsApiKey || '');
   const [localGeminiApiKey,       setLocalGeminiApiKey]       = useState(geminiApiKey || '');
   const [localWavespeedApiKey,    setLocalWavespeedApiKey]    = useState(wavespeedApiKey || '');
-  const [localAirforceApiKey,     setLocalAirforceApiKey]     = useState(airforceApiKey || '');
   const [isFirebaseBackingUp,  setIsFirebaseBackingUp]  = useState(false);
   const [isFirebaseRestoring,  setIsFirebaseRestoring]  = useState(false);
   const [isGalleryBackingUp,   setIsGalleryBackingUp]   = useState(false);
@@ -92,7 +90,6 @@ const SettingsScreen: React.FC = () => {
   React.useEffect(() => { setLocalElevenLabsApiKey(elevenLabsApiKey || ''); }, [elevenLabsApiKey]);
   React.useEffect(() => { setLocalGeminiApiKey(geminiApiKey || ''); }, [geminiApiKey]);
   React.useEffect(() => { setLocalWavespeedApiKey(wavespeedApiKey || ''); }, [wavespeedApiKey]);
-  React.useEffect(() => { setLocalAirforceApiKey(airforceApiKey || ''); }, [airforceApiKey]);
   const [localSyncId,          setLocalSyncId]          = useState(userId || '');
   const [isExporting,          setIsExporting]          = useState(false);
   const [isImporting,          setIsImporting]          = useState(false);
@@ -152,11 +149,6 @@ const SettingsScreen: React.FC = () => {
   const handleSaveWavespeedKey = () => {
     setWavespeedApiKey(localWavespeedApiKey.trim() || null);
     addToast({ title: 'Saved', message: 'WaveSpeed API key saved.', type: 'success' });
-  };
-
-  const handleSaveAirforceKey = () => {
-    setAirforceApiKey(localAirforceApiKey.trim() || null);
-    addToast({ title: 'Saved', message: 'api.airforce API key saved.', type: 'success' });
   };
 
   const handleSaveFirebaseConfig = () => {
@@ -590,30 +582,6 @@ const SettingsScreen: React.FC = () => {
                 Get a key at <a href="https://wavespeed.ai" target="_blank" rel="noreferrer" className="underline">wavespeed.ai</a>. Required for the Image Generator.
               </p>
             </div>
-
-            {/* api.airforce */}
-            <div>
-              <label className="block text-sm font-medium text-indigo-700 dark:text-indigo-300 mb-1">
-                api.airforce API Key <span className="text-indigo-400 dark:text-indigo-500 font-normal">(optional — for api.airforce models)</span>
-              </label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-400" />
-                  <input
-                    type="password"
-                    value={localAirforceApiKey}
-                    onChange={(e) => setLocalAirforceApiKey(e.target.value)}
-                    placeholder="Your sk-air-… API key"
-                    className="app-input pl-9"
-                  />
-                </div>
-                <button onClick={handleSaveAirforceKey} className="app-btn-primary">Save</button>
-              </div>
-              <p className="text-xs text-indigo-500 dark:text-indigo-400 mt-1">
-                Get a key at <a href="https://panel.api.airforce" target="_blank" rel="noreferrer" className="underline">panel.api.airforce</a>. Enables access to 100+ models including GPT, DeepSeek, Llama, and more.
-              </p>
-            </div>
-
 
           </div>
         </section>

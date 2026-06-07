@@ -14,7 +14,7 @@ const ChatScreen: React.FC = () => {
   const { 
     aiProfile, userProfile, knowledgeBase, 
     addToKnowledgeBase, addToGallery, apiKey,
-    anthropicApiKey, geminiApiKey, elevenLabsApiKey, airforceApiKey,
+    anthropicApiKey, geminiApiKey, elevenLabsApiKey,
     memories, journal, 
     addJournalEntry, addMemory, showTimestamps, timeZone, addToast,
     setAIProfile, setLastInteractionTime
@@ -412,7 +412,6 @@ const ChatScreen: React.FC = () => {
           userProfile,
           anthropicKey: anthropicApiKey || undefined,
           geminiKey: geminiApiKey || undefined,
-          airforceKey: airforceApiKey || undefined,
           attachments: attachments.length > 0 ? attachments : undefined,
           timeZone,
         }),
@@ -473,7 +472,6 @@ const ChatScreen: React.FC = () => {
             aiProfile, userProfile, timeZone,
             anthropicKey: anthropicApiKey || undefined,
           geminiKey: geminiApiKey || undefined,
-          airforceKey: airforceApiKey || undefined,
           }),
         });
         if (res.ok) {
@@ -502,7 +500,6 @@ const ChatScreen: React.FC = () => {
           existingMemories: memories,
           anthropicKey: anthropicApiKey || undefined,
           geminiKey: geminiApiKey || undefined,
-          airforceKey: airforceApiKey || undefined,
         }),
       });
       if (res.ok) {

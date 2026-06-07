@@ -30,7 +30,7 @@ const AIProfileScreen: React.FC = () => {
   const {
     aiProfile, setAIProfile, savePersona, deletePersona, savedPersonas, loadPersona,
     setAmbientMode, setAmbientFrequency, addToast,
-    anthropicApiKey, elevenLabsApiKey, geminiApiKey, airforceApiKey, userId,
+    anthropicApiKey, elevenLabsApiKey, geminiApiKey, userId,
   } = useApp();
   const { chatHistory, sessions, activeSessionId, setChatHistory, setSessions, setActiveSessionId } = useChat();
   const [name, setName] = useState(aiProfile.name);
@@ -97,12 +97,9 @@ const AIProfileScreen: React.FC = () => {
   };
 
   const [model, setModel] = useState(validateModel(aiProfile.model));
-  const [llmProvider, setLlmProvider] = useState<'claude' | 'gemini' | 'airforce'>(
-    (aiProfile.llmProvider === 'airforce' ? 'airforce' : aiProfile.llmProvider === 'gemini' ? 'gemini' : 'claude')
+  const [llmProvider, setLlmProvider] = useState<'claude' | 'gemini'>(
+    (aiProfile.llmProvider === 'gemini' ? 'gemini' : 'claude')
   );
-  const [airforceModels, setAirforceModels] = useState<string[]>([]);
-  const [isFetchingAFModels, setIsFetchingAFModels] = useState(false);
-  const [airforceModelsError, setAirforceModelsError] = useState('');
   const [temperature, setTemperature] = useState(aiProfile.temperature || 0.7);
   const [timeAwareness, setTimeAwareness] = useState<boolean>(aiProfile.timeAwareness ?? true);
   const [ambientModeState, setAmbientModeState] = useState<boolean>(aiProfile.ambientMode ?? false);
@@ -259,7 +256,7 @@ const AIProfileScreen: React.FC = () => {
     setKnowsItsAI(aiProfile.knowsItsAI ?? true);
     setReferenceImage(aiProfile.referenceImage);
     setModel(validateModel(aiProfile.model));
-    setLlmProvider(aiProfile.llmProvider === 'airforce' ? 'airforce' : aiProfile.llmProvider === 'gemini' ? 'gemini' : 'claude');
+    setLlmProvider(aiProfile.llmProvider === 'gemini' ? 'gemini' : 'claude');
     setTemperature(aiProfile.temperature || 0.7);
     setTimeAwareness(aiProfile.timeAwareness !== undefined ? aiProfile.timeAwareness : true);
     setAmbientModeState(aiProfile.ambientMode ?? false);
@@ -692,28 +689,6 @@ const AIProfileScreen: React.FC = () => {
 
   // LLM max tokens
   const [maxTokens, setMaxTokens] = useState<number>(aiProfile.maxTokens ?? 2048);
-
-  const fetchAirforceModels = async () => {
-    if (!airforceApiKey) {
-      setAirforceModelsError('Add your api.airforce API key in Settings first.');
-      return;
-    }
-    setIsFetchingAFModels(true);
-    setAirforceModelsError('');
-    try {
-      const res = await fetch(`/api/airforce/models?api_key=${encodeURIComponent(airforceApiKey)}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to fetch models');
-      setAirforceModels(data.models || []);
-      if ((data.models || []).length > 0 && !data.models.includes(model)) {
-        setModel(data.models[0]);
-      }
-    } catch (e: any) {
-      setAirforceModelsError(e.message || 'Could not load models.');
-    } finally {
-      setIsFetchingAFModels(false);
-    }
-  };
 
   const fetchElevenLabsVoices = useCallback(async () => {
     if (!elevenLabsApiKey) return;
@@ -1194,21 +1169,16 @@ const AIProfileScreen: React.FC = () => {
                             <select
                                 value={llmProvider}
                                 onChange={(e) => {
-                                  const p = e.target.value as 'claude' | 'gemini' | 'airforce';
+                                  const p = e.target.value as 'claude' | 'gemini';
                                   setLlmProvider(p);
                                   // Reset model to a sensible default for the new provider
                                   if (p === 'claude') setModel('claude-sonnet-4-6');
                                   else if (p === 'gemini') setModel('gemini-2.0-flash');
-                                  else if (p === 'airforce') {
-                                    if (airforceModels.length > 0) setModel(airforceModels[0]);
-                                    else fetchAirforceModels();
-                                  }
                                 }}
                                 className="w-full p-2 border border-indigo-300 dark:border-indigo-700 rounded-md bg-white dark:bg-indigo-900 text-indigo-900 dark:text-indigo-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                             >
                                 <option value="claude">Anthropic Claude</option>
                                 <option value="gemini">Google Gemini</option>
-                                <option value="airforce">api.airforce (100+ models)</option>
                             </select>
                         </div>
 
@@ -1240,34 +1210,6 @@ const AIProfileScreen: React.FC = () => {
                                 </select>
                             )}
 
-                            {llmProvider === 'airforce' && (
-                                <div className="space-y-2">
-                                    {airforceModels.length > 0 ? (
-                                        <select
-                                            value={model}
-                                            onChange={(e) => setModel(e.target.value)}
-                                            className="w-full p-2 border border-indigo-300 dark:border-indigo-700 rounded-md bg-white dark:bg-indigo-900 text-indigo-900 dark:text-indigo-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                        >
-                                            {airforceModels.map(m => (
-                                                <option key={m} value={m}>{m}</option>
-                                            ))}
-                                        </select>
-                                    ) : (
-                                        <p className="text-xs text-indigo-500 dark:text-indigo-400">
-                                            {airforceModelsError || (isFetchingAFModels ? 'Loading models…' : 'No models loaded yet.')}
-                                        </p>
-                                    )}
-                                    <button
-                                        onClick={fetchAirforceModels}
-                                        disabled={isFetchingAFModels}
-                                        className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline disabled:opacity-50 flex items-center gap-1"
-                                    >
-                                        {isFetchingAFModels ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
-                                        {isFetchingAFModels ? 'Loading…' : airforceModels.length > 0 ? 'Refresh model list' : 'Load models from api.airforce'}
-                                    </button>
-                                    {airforceModelsError && <p className="text-xs text-red-500">{airforceModelsError}</p>}
-                                </div>
-                            )}
                         </div>
                         
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
