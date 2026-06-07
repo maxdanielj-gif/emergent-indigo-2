@@ -407,6 +407,8 @@ const ChatScreen: React.FC = () => {
           geminiKey: geminiApiKey || undefined,
           attachments: attachments.length > 0 ? attachments : undefined,
           timeZone,
+          memories: memories.length > 0 ? memories : undefined,
+          journal: journal.length > 0 ? journal.slice(-3) : undefined,
         }),
       });
 
