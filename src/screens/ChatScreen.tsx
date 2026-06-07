@@ -8,7 +8,7 @@ import { generateElevenLabsSpeech } from '../services/asyncService';
 import { showNativeNotification } from '../services/notificationService';
 import ChatMessageItem from '../components/ChatMessageItem';
 import ImageModal from '../components/ImageModal';
-import { performOCR, processFile } from '../services/ocrService';
+import { processFile } from '../services/ocrService';
 
 const ChatScreen: React.FC = () => {
   const { 
@@ -87,39 +87,32 @@ const ChatScreen: React.FC = () => {
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      addToast({ title: "Upload", message: "Processing image with OCR...", type: "info" });
       setIsUploading(true);
       const file = e.target.files[0];
-      
       try {
-        const ocrText = await performOCR(file, apiKey || undefined);
-        
         const reader = new FileReader();
         reader.onload = (event) => {
           if (event.target?.result) {
             setAttachments(prev => [...prev, {
-              type: 'image',
+              type: 'image' as const,
               content: event.target!.result as string,
               name: file.name
             }]);
-            
-            // Add OCR result to knowledge base
-            addToKnowledgeBase({
-              name: `OCR: ${file.name}`,
-              content: ocrText
-            });
-            
+            addToast({ title: "Image attached", message: file.name, type: "success" });
             setIsUploading(false);
           }
         };
+        reader.onerror = () => {
+          addToast({ title: "Upload Error", message: "Failed to read image", type: "error" });
+          setIsUploading(false);
+        };
         reader.readAsDataURL(file);
       } catch (error) {
-        console.error("Image OCR failed:", error);
-        addToast({ title: "OCR Error", message: "Failed to extract text from image", type: "error" });
+        console.error("Image upload failed:", error);
+        addToast({ title: "Upload Error", message: "Failed to attach image", type: "error" });
         setIsUploading(false);
       }
     }
-    // Reset input
     if (imageInputRef.current) imageInputRef.current.value = '';
   };
 
@@ -920,10 +913,10 @@ const ChatScreen: React.FC = () => {
                 [Action]
             </button>
             <button 
-                onClick={() => setInput("(OOC: ) " + input)}
+                onClick={() => setInput("<OOC: > " + input)}
                 className="flex-shrink-0 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 rounded-xl text-xs font-bold border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-all active:scale-95"
             >
-                (OOC)
+                &lt;OOC&gt;
             </button>
         </div>
 
