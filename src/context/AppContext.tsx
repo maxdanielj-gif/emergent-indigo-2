@@ -54,8 +54,6 @@ interface AppState {
   setGeminiApiKey: (key: string | null) => void;
   wavespeedApiKey: string | null;
   setWavespeedApiKey: (key: string | null) => void;
-  airforceApiKey: string | null;
-  setAirforceApiKey: (key: string | null) => void;
   lastInteractionTime: number;
   userId: string;
   isSuccessfullyLoaded: boolean;
@@ -275,7 +273,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [elevenLabsApiKey, setElevenLabsApiKeyState] = useState<string | null>(null);
   const [geminiApiKey, setGeminiApiKeyState] = useState<string | null>(null);
   const [wavespeedApiKey, setWavespeedApiKeyState] = useState<string | null>(null);
-  const [airforceApiKey, setAirforceApiKeyState] = useState<string | null>(null);
   const [autoSaveChat, setAutoSaveChatState] = useState(true);
   const [autoSaveChatInterval, setAutoSaveChatInterval] = useState(30); // Default 30 seconds
   const [autoJsonBackup, setAutoJsonBackupState] = useState(false);
@@ -550,7 +547,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 setElevenLabsApiKeyState(savedData.elevenLabsApiKey || null);
                 setGeminiApiKeyState(savedData.geminiApiKey || null);
                 setWavespeedApiKeyState(savedData.wavespeedApiKey || null);
-                setAirforceApiKeyState(savedData.airforceApiKey || null);
 
                 setLastCloudSyncTimeState(savedData.lastCloudSyncTime || null);
                 setLastFirebaseBackupTimeState(savedData.lastFirebaseBackupTime || null);
@@ -646,7 +642,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           elevenLabsApiKey,
           geminiApiKey,
           wavespeedApiKey,
-          airforceApiKey,
           lastCloudSyncTime,
           lastFirebaseBackupTime,
           lastGalleryBackupTime,
@@ -811,7 +806,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           gallery,
           apiKey, anthropicApiKey, elevenLabsApiKey, geminiApiKey,
           wavespeedApiKey,
-          airforceApiKey,
           autoSaveChat, autoBackupSchedule,
         }, firebaseRuntimeConfig);
         const ts = Date.now();
@@ -854,7 +848,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           gallery,
           apiKey, anthropicApiKey, elevenLabsApiKey, geminiApiKey,
           wavespeedApiKey,
-          airforceApiKey,
           autoSaveChat, autoBackupSchedule, realTimeSyncEnabled,
         }, firebaseRuntimeConfig);
         console.log('[Indigo] Real-time sync → Firestore complete');
@@ -1197,13 +1190,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setWavespeedApiKeyState(key);
     loadFromDB('indigo_app_data_core').then((core: any) => {
       if (core) saveToDB('indigo_app_data_core', { ...core, wavespeedApiKey: key });
-    }).catch(() => {});
-  };
-
-  const setAirforceApiKey = (key: string | null) => {
-    setAirforceApiKeyState(key);
-    loadFromDB('indigo_app_data_core').then((core: any) => {
-      if (core) saveToDB('indigo_app_data_core', { ...core, airforceApiKey: key });
     }).catch(() => {});
   };
 
@@ -1742,7 +1728,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       elevenLabsApiKey, setElevenLabsApiKey,
       geminiApiKey, setGeminiApiKey,
       wavespeedApiKey, setWavespeedApiKey,
-      airforceApiKey, setAirforceApiKey,
       isLoaded, isSuccessfullyLoaded, lastInteractionTime, setLastInteractionTime,
       userId, setUserId, isSyncing, setIsSyncing,
       exportGalleryData, exportGalleryChunks, importGalleryData, importGalleryChunks, syncGalleryToCloud, restoreGalleryFromCloud,
