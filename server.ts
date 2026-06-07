@@ -118,7 +118,7 @@ async function callGeminiChat(
 }
 
 // ── Build persona system prompt ───────────────────────────────────────────────
-function buildSystemPrompt(aiProfile: any, userProfile: any, timeZone?: string): string {
+function buildSystemPrompt(aiProfile: any, userProfile: any, timeZone?: string, memories?: any[], journal?: any[]): string {
   const now = new Date();
   const timeContext = aiProfile.timeAwareness
     ? `\n\nCurrent time: ${now.toLocaleString("en-US", { timeZone: timeZone || "UTC", weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })}`
@@ -141,6 +141,27 @@ function buildSystemPrompt(aiProfile: any, userProfile: any, timeZone?: string):
     ? `\n\nIMPORTANT: Respond with plain spoken words only. Do NOT use asterisks for actions or emotes (e.g. do not write *smiles* or *leans forward*). If you want to convey an action, use square brackets instead (e.g. [smiles] or [leans forward]). Speak naturally as you would out loud.`
     : "";
 
+  // Memories — important ones first, then the rest, capped at 25
+  const memoriesContext = memories && memories.length > 0
+    ? (() => {
+        const sorted = [...memories].sort((a, b) => (b.isImportant ? 1 : 0) - (a.isImportant ? 1 : 0));
+        const capped = sorted.slice(0, 25);
+        return `\n\nWhat I remember about ${userProfile.name}:\n${capped.map((m: any) => `- ${m.content}`).join('\n')}`;
+      })()
+    : "";
+
+  // Journal — last 3 entries give context about recent conversations
+  const journalContext = journal && journal.length > 0
+    ? (() => {
+        const recent = journal.slice(-3);
+        const entries = recent.map((j: any) => {
+          const date = new Date(j.date).toLocaleDateString("en-US", { weekday: 'short', month: 'short', day: 'numeric' });
+          return `[${date}]: ${j.content}`;
+        }).join('\n\n');
+        return `\n\nMy recent journal entries:\n${entries}`;
+      })()
+    : "";
+
   const parts = [
     `You are ${aiProfile.name}.`,
     `Personality: ${aiProfile.personality}.`,
@@ -155,6 +176,8 @@ function buildSystemPrompt(aiProfile: any, userProfile: any, timeZone?: string):
     `You are talking to: ${userProfile.name}.`,
     userProfile.info ? `About them: ${userProfile.info}.` : "",
     timeContext,
+    memoriesContext,
+    journalContext,
     lengthGuidance,
     toneGuidance,
     personaGuidance,
@@ -619,12 +642,12 @@ app.get("/api/sync/:userId?", (req, res) => {
 
 // ── Claude AI: main chat ──────────────────────────────────────────────────────
 app.post("/api/chat", async (req, res) => {
-  const { messages, aiProfile, userProfile, anthropicKey: clientKey, geminiKey, timeZone, attachments } = req.body;
+  const { messages, aiProfile, userProfile, anthropicKey: clientKey, geminiKey, timeZone, attachments, memories, journal } = req.body;
   if (!aiProfile || !userProfile) {
     return res.status(400).json({ error: "AI Profile and User Profile are required." });
   }
 
-  const systemPrompt = buildSystemPrompt(aiProfile, userProfile, timeZone);
+  const systemPrompt = buildSystemPrompt(aiProfile, userProfile, timeZone, memories, journal);
   const selectedModel = aiProfile.model || "claude-sonnet-4-6";
   const useGemini = isGeminiModel(selectedModel);
 
@@ -1136,7 +1159,7 @@ app.post("/api/memory-extract", async (req, res) => {
 
     const prompt = `${personaNote}
 
-Extract any new, significant long-term fact about ${userProfile.name} from this interaction that you should remember.
+From this exchange, extract any information about ${userProfile.name} worth remembering — facts, preferences, experiences, opinions, or anything they mentioned about themselves or their life.
 
 ${userProfile.name}: ${userMsg}
 You: ${aiMsg}
@@ -1144,7 +1167,7 @@ You: ${aiMsg}
 Already known:
 ${(existingMemories || []).map((m: any) => m.content).join("; ")}
 
-If there is a new fact worth remembering, write it as a single concise sentence in the first person from your perspective as ${aiProfile.name} (e.g. "I know that ${userProfile.name} loves hiking" or "${userProfile.name} told me their favourite colour is blue"). Otherwise write exactly NOTHING.`;
+If something new and useful comes up, write it as a single concise sentence from your perspective as ${aiProfile.name} (e.g. "${userProfile.name} mentioned they work as a nurse" or "${userProfile.name} loves horror films but hates gore"). If nothing new was shared, write exactly NOTHING.`;
 
     const text = await callActiveProvider(prompt, aiProfile, { anthropicKey, geminiKey }, 100);
     res.json({ memory: !text || text === "NOTHING" || text.includes("NOTHING") ? null : text });
