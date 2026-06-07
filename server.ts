@@ -117,7 +117,7 @@ async function callGeminiChat(
 function buildSystemPrompt(aiProfile: any, userProfile: any, timeZone?: string): string {
   const now = new Date();
   const timeContext = aiProfile.timeAwareness
-    ? `\n\nCurrent time: ${now.toLocaleString("en-US", { timeZone: timeZone || "UTC" })}`
+    ? `\n\nCurrent time: ${now.toLocaleString("en-US", { timeZone: timeZone || "UTC", weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })}`
     : "";
 
   const lengthGuidance =
@@ -242,7 +242,7 @@ async function generateAndSendProactiveMessage(
     const client = getAnthropicClient(clientKey);
     const now = new Date();
     const timeContext = aiProfile.timeAwareness
-      ? `\n[Current time: ${now.toLocaleString("en-US", { timeZone: timeZone || "UTC" })}]`
+      ? `\n[Current time: ${now.toLocaleString("en-US", { timeZone: timeZone || "UTC", weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })}]`
       : "";
     const recentHistory = (Array.isArray(chatHistory) ? chatHistory : [])
       .slice(-3)
@@ -1099,7 +1099,7 @@ async function callActiveProvider(
 app.post("/api/journal-reflection", async (req, res) => {
   const { userMsg, aiMsg, aiProfile, userProfile, anthropicKey, geminiKey, timeZone } = req.body;
   try {
-    const today = new Date().toLocaleDateString("en-US", { timeZone: timeZone || "UTC" });
+    const today = new Date().toLocaleDateString("en-US", { timeZone: timeZone || "UTC", weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     const personaNote = !aiProfile.knowsItsAI ? " Do not call yourself an AI." : "";
 
     const prompt = `As ${aiProfile.name}, write a short personal journal entry (under 100 words) reflecting on this conversation with ${userProfile.name} today (${today}). Write in first person.${personaNote}
