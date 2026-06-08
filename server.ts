@@ -1202,22 +1202,24 @@ async function callActiveProvider(
   maxTokens: number,
 ): Promise<string> {
   const provider = aiProfile.llmProvider || 'claude';
-  // Always pick a model that belongs to the active provider — avoids passing
-  // a Claude model string to the Gemini API (or vice versa) when the profile
-  // model field is missing or stale.
-  const model = provider === 'gemini'
-    ? (isGeminiModel(aiProfile.model) ? aiProfile.model : 'gemini-2.0-flash')
-    : (aiProfile.model || 'claude-haiku-4-5-20251001');
 
-  // ── Gemini ───────────────────────────────────────────────────────────────
-  if (provider === 'gemini' || isGeminiModel(model)) {
-    return await callGeminiChat('', [{ role: 'user', content: prompt }], model, 0.7, keys.geminiKey);
+  // Background tasks (memory, journal, summarize) always use lightweight models
+  // regardless of what the user chose for main chat. This avoids timeouts from
+  // slower Pro/Preview models and keeps costs low for these simple extraction jobs.
+  const TIMEOUT_MS = 25000;
+
+  if (provider === 'gemini') {
+    const task = callGeminiChat('', [{ role: 'user', content: prompt }], 'gemini-2.0-flash', 0.7, keys.geminiKey);
+    const timer = new Promise<string>((_, reject) =>
+      setTimeout(() => reject(new Error('Gemini background task timed out after 25 seconds')), TIMEOUT_MS)
+    );
+    return await Promise.race([task, timer]);
   }
 
   // ── Claude (default) ─────────────────────────────────────────────────────
   const client = getAnthropicClient(keys.anthropicKey);
   const response = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001', // always use Haiku for background tasks — fast and cheap
+    model: 'claude-haiku-4-5-20251001',
     max_tokens: maxTokens,
     messages: [{ role: 'user', content: prompt }],
   });
@@ -1241,7 +1243,7 @@ Journal entry:`;
     res.json({ content: text });
   } catch (e: any) {
     console.error("Journal reflection error:", e.message);
-    res.status(500).json({ error: "Failed to generate journal reflection." });
+    res.status(500).json({ error: e.message || "Failed to generate journal reflection." });
   }
 });
 
@@ -1281,7 +1283,7 @@ If something new and useful comes up, write it as a single concise sentence from
     res.json({ memory: isNothing ? null : text });
   } catch (e: any) {
     console.error("Memory extract error:", e.message);
-    res.status(500).json({ error: "Failed to extract memory." });
+    res.status(500).json({ error: e.message || "Failed to extract memory." });
   }
 });
 
@@ -1328,7 +1330,7 @@ Be concise. Skip pleasantries and small talk. Write only what future conversatio
     res.json({ summary: text });
   } catch (e: any) {
     console.error("Summarize error:", e.message);
-    res.status(500).json({ error: "Failed to generate summary." });
+    res.status(500).json({ error: e.message || "Failed to generate summary." });
   }
 });
 
