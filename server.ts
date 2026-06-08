@@ -1257,30 +1257,24 @@ app.post("/api/memory-extract", async (req, res) => {
 
     const prompt = `${personaNote}
 
-From this exchange, extract any information about ${userProfile.name} worth remembering — facts, preferences, experiences, opinions, or anything they mentioned about themselves or their life.
+Review this exchange and decide whether ${userProfile.name} shared anything worth remembering — facts about themselves, preferences, experiences, opinions, plans, or anything personal.
 
 ${userProfile.name}: ${userMsg}
 You: ${aiMsg}
 
-Already known:
-${(existingMemories || []).map((m: any) => m.content).join("; ")}
+Already known about ${userProfile.name}:
+${(existingMemories || []).map((m: any) => m.content).join("; ") || "Nothing yet."}
 
-If something new and useful comes up, write it as a single concise sentence from your perspective as ${aiProfile.name} (e.g. "${userProfile.name} mentioned they work as a nurse" or "${userProfile.name} loves horror films but hates gore"). If nothing new was shared, write exactly NOTHING.`;
+Rules:
+- If something new and useful was shared, respond with exactly: NEW_MEMORY: followed by a single concise sentence (e.g. "NEW_MEMORY: ${userProfile.name} works as a nurse" or "NEW_MEMORY: ${userProfile.name} loves horror films but dislikes gore")
+- If nothing new was shared, or it's already in the known list, respond with exactly: NO_MEMORY
+- No other text. No explanation. Just one of those two responses.`;
 
-    const text = await callActiveProvider(prompt, aiProfile, { anthropicKey, geminiKey }, 100);
-    const t = (text || "").trim().toLowerCase();
-    const isNothing = !t
-      || t === "nothing"
-      || t.startsWith("nothing.")
-      || t.startsWith("nothing ")
-      || t.startsWith("no new")
-      || t.startsWith("no information")
-      || t.startsWith("there is nothing")
-      || t.startsWith("there's nothing")
-      || t.startsWith("there are no")
-      || t.includes("nothing new")
-      || t.includes("nothing worth");
-    res.json({ memory: isNothing ? null : text });
+    const raw = (await callActiveProvider(prompt, aiProfile, { anthropicKey, geminiKey }, 120)).trim();
+    const memory = raw.startsWith("NEW_MEMORY:")
+      ? raw.slice("NEW_MEMORY:".length).trim() || null
+      : null;
+    res.json({ memory });
   } catch (e: any) {
     console.error("Memory extract error:", e.message);
     res.status(500).json({ error: e.message || "Failed to extract memory." });
